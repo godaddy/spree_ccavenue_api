@@ -37,3 +37,5 @@ require 'spree_ccavenue/factories'
 ```
 
 Copyright (c) 2014 CCAvenue, released under the New BSD License
+=======
+spree_ccavenue_api
