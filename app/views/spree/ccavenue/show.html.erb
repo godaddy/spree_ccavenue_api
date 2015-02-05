@@ -1,0 +1,31 @@
+<div id="checkout" data-hook>
+  <%= render partial: 'spree/shared/error_messages', locals: { target: @order } %>
+  <h3><%= t(:checkout) %></h3>  
+  <div class="alpha omega grid_24">
+    <div class="<%= css_class_based_on_order_state(@order) %>">
+      <div class="clear"></div>
+      <div class="checkout_form">
+        <%= form_tag @payment_method.url do %>
+          <%
+             merchant_id     = @payment_method.preferred_merchant_id
+             access_code     = @payment_method.preferred_access_code
+             encryption_key  = @payment_method.preferred_encryption_key
+             redirect_url    = gateway_ccavenue_callback_url(@transaction, :protocol => 'http')
+             enc_request     = encrypted_request(@payment_method, @transaction, @order, redirect_url, encryption_key)
+          %>
+
+          <%= hidden_field_tag 'command',                      'initiateTransaction' %>
+          <%= hidden_field_tag 'Instant Gratification',        'Y' %>
+          <%= hidden_field_tag 'merchant_id',                  merchant_id %>
+          <%= hidden_field_tag 'access_code',                  access_code %>
+          <%= hidden_field_tag 'encRequest',                   enc_request %>
+
+          <%= render :partial => 'spree/checkout/confirm' %>
+          <p style="margin: 10px 0;"><%= Spree.t(:ccavenue_instructional_text) %></p><br/>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  <div class="clear"></div>
+</div>
+
