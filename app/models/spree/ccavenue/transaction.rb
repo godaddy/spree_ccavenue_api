@@ -9,19 +9,19 @@ module Spree
       raise ArgumentError.new( Spree.t('missing_tracking_id') ) unless tracking_id
 
       Rails.logger.info "Initiating cancel API call for order: #{order.id} tracking_id: #{tracking_id}"
-      response = ApiCaller.cancel(order, payment_method, tracking_id)
+      response = Ccavenue::ApiCaller.cancel(order, payment_method, tracking_id)
       Rails.logger.info "Received following API cancel response: #{response.inspect} for order ID: #{order.id} tracking id: #{tracking_id}"
       return response if response.success? # cancel command succeeded
 
       Rails.logger.info "Initiating refund API call for order: #{order.id} tracking_id: #{tracking_id}"
-      response = ApiCaller.refund(order, payment_method, tracking_id)
+      response = Ccavenue::ApiCaller.refund(order, payment_method, tracking_id)
       Rails.logger.info "Received following API refund response: #{response.inspect} for order ID: #{order.id} tracking id: #{tracking_id}"
       response
     end
 
     def status
       Rails.logger.info "Initiating status API call for order: #{order.id} tracking_id: #{tracking_id}"
-      response = ApiCaller.status(payment_method, order, tracking_id)
+      response = Ccavenue::ApiCaller.status(payment_method, order, tracking_id)
       Rails.logger.info "Received following API status response: #{response.inspect} for order ID: #{order.id} tracking id: #{tracking_id}"
       response
     end
