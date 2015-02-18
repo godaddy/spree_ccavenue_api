@@ -16,7 +16,9 @@ en:
   transaction_not_found: 'Transaction with id: %{id} not found!'
   order_not_in_confirm_state: "Order is not in 'confirm' state. Order should be in 'confirm' state before transaction can be sent to CCAvenue"
   refund_failed: 'Refund failed: %{reason}'
-  missing_tracking_id: Missing tracking id
+  missing_tracking_id: 'Missing tracking id'
+  ccavenue_missing_creds: 'One or more merchant credentials are missing.'
+  ccavenue_validation_failed: 'One or more merchant credentials are incorrect'
   ccavenue:
     transaction: "Transaction"
     state: "State"

@@ -9,6 +9,17 @@ module Spree
     preference :access_code, :string
     preference :encryption_key, :string
 
+    validate :merchant_info_validation, on: :update
+
+    def merchant_info_validation
+      if self.preferred_access_code.blank? || self.preferred_merchant_id.blank? || self.preferred_encryption_key.blank?
+        errors.add(:base, Spree.t(:ccavenue_missing_creds)) and return
+      end
+      if reason = ::Ccavenue::ApiCaller.validate_creds(self)
+        errors.add(:base, Spree.t(:ccavenue_validation_failed))
+      end
+    end
+
     def actions
       %w{capture void status sync}
     end

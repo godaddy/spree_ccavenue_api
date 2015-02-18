@@ -83,7 +83,16 @@ module Ccavenue
     end
 
     def self.signup_url(payment_method)
-      payment_method.preferred_test_mode ? 'http://180.179.175.17/web/registration.do?command=navigateSchemeForm' : 'http://login.ccavenue.com/web/registration.do?command=navigateSchemeForm'
+      payment_method.preferred_test_mode ? 'https://180.179.175.17/web/registration.do?command=navigateSchemeForm' : 'https://login.ccavenue.com/web/registration.do?command=navigateSchemeForm'
+    end
+
+    def self.validate_creds(payment_method)
+      reason = self.status(payment_method, nil, nil).reason
+      unless reason.include?('Providing Reference_No/Order No is mandatory')
+        Rails.logger.error "CCAve cred validation error: #{reason}"
+        return reason
+      end
+      nil
     end
 
     class ApiResponse
