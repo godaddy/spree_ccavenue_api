@@ -1,9 +1,10 @@
-require 'unirest'
 require 'rack'
 require 'aes_crypter'
 
 module Ccavenue
   class ApiCaller
+
+    VALIDATION_SUCCESS_MSG = 'Providing Reference_No/Order No is mandatory'
 
     def self.refund(order, payment_method, tracking_id)
       json_params = json_params_for_encryption(order, payment_method, tracking_id) # Params required for encryption
@@ -50,14 +51,15 @@ module Ccavenue
 
     private
 
-    def self.decrypted_response(url, params, encryption_key)
+    def self.decrypted_response(url, params, encryption_key, verify_ssl=nil)
       response = nil
+      verify_ssl ||= Rails.env.development? ? false : nil
       begin
-        Rails.logger.info "Params sent to #{url}: #{params.inspect}"
-        response = Unirest.post(url,
-                                headers: {'Accept' => 'application/json'},
-                                parameters: params)
-      rescue RuntimeError => error
+        Rails.logger.info "Params sent to #{url}: #{params.inspect}\nverify_ssl: '#{verify_ssl}'"
+        response = RestClient::Request.execute(method: :post, url: url, payload: params,
+                                headers: {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
+                                verify_ssl: verify_ssl)
+      rescue RestClient::RequestTimeout, RestClient::Exception, RuntimeError => error
         return ApiResponse.new({status: 1, enc_response: error.message}, encryption_key)
       end
       decrypt_response(response, encryption_key)
@@ -86,13 +88,23 @@ module Ccavenue
       payment_method.preferred_test_mode ? 'https://180.179.175.17/web/registration.do?command=navigateSchemeForm' : 'https://login.ccavenue.com/web/registration.do?command=navigateSchemeForm'
     end
 
-    def self.validate_creds(payment_method)
-      reason = self.status(payment_method, nil, nil).reason
-      unless reason.include?('Providing Reference_No/Order No is mandatory')
+    def self.validate_creds(payment_method, access_code, encryption_key)
+      url = api_url(payment_method)
+      params = {
+          request_type: 'JSON',
+          command: 'orderStatusTracker',
+          access_code: access_code,
+          enc_request: AESCrypter.encrypt({reference_no: '', order_no: ''}.to_json.to_s, encryption_key)
+      }
+      reason = (decrypted_response(url, params, encryption_key)).reason
+      unless reason.include?(VALIDATION_SUCCESS_MSG)
         Rails.logger.error "CCAve cred validation error: #{reason}"
         return reason
       end
       nil
+    rescue => e
+      Rails.logger.error e.message
+      return e.message
     end
 
     class ApiResponse
