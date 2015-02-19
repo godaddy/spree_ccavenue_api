@@ -18,7 +18,7 @@ module Ccavenue
           enc_request: AESCrypter.encrypt(json_params.to_s, encryption_key)
       }
 
-      decrypted_response(url, params, encryption_key)
+      decrypted_response(url, params, encryption_key, !payment_method.preferred_test_mode)
     end
 
     def self.cancel(order, payment_method, tracking_id)
@@ -33,7 +33,7 @@ module Ccavenue
           access_code: payment_method.preferred_access_code,
           enc_request: AESCrypter.encrypt(json_params_for_encryption, encryption_key)
       }
-      decrypted_response(url, params, encryption_key)
+      decrypted_response(url, params, encryption_key, !payment_method.preferred_test_mode)
     end
 
     def self.status(payment_method, order, tracking_id)
@@ -46,14 +46,13 @@ module Ccavenue
           access_code: payment_method.preferred_access_code,
           enc_request: AESCrypter.encrypt({reference_no: tracking_id.to_s, order_no: order_no}.to_json.to_s, encryption_key)
       }
-      decrypted_response(url, params, encryption_key)
+      decrypted_response(url, params, encryption_key, !payment_method.preferred_test_mode)
     end
 
     private
 
     def self.decrypted_response(url, params, encryption_key, verify_ssl=nil)
       response = nil
-      verify_ssl ||= Rails.env.development? ? false : nil
       begin
         Rails.logger.info "Params sent to #{url}: #{params.inspect}\nverify_ssl: '#{verify_ssl}'"
         response = RestClient::Request.execute(method: :post, url: url, payload: params,
@@ -96,7 +95,7 @@ module Ccavenue
           access_code: access_code,
           enc_request: AESCrypter.encrypt({reference_no: '', order_no: ''}.to_json.to_s, encryption_key)
       }
-      reason = (decrypted_response(url, params, encryption_key)).reason
+      reason = (decrypted_response(url, params, encryption_key, !payment_method.preferred_test_mode)).reason
       unless reason.include?(VALIDATION_SUCCESS_MSG)
         Rails.logger.error "CCAve cred validation error: #{reason}"
         return reason
