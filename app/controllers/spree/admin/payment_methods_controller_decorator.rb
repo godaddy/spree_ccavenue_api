@@ -11,7 +11,7 @@ Spree::Admin::PaymentMethodsController.class_eval do
       if payment_method_preferred_params_invalid?(payment_method)
         format.html { render text: 'Verification failed' }
       else
-        reason = Ccavenue::ApiCaller.status(payment_method, nil, nil).reason
+        reason = CcavenueApi::ApiCaller.status(payment_method, nil, nil).reason
         reason = (reason.include?('Providing Reference_No/Order No is mandatory')) ? 'Verified successfully' : reason
         format.html { render text: reason }
       end

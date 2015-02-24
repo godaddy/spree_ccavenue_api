@@ -1,7 +1,7 @@
 require 'rack'
 require 'aes_crypter'
 
-module Ccavenue
+module CcavenueApi
   class ApiCaller
 
     VALIDATION_SUCCESS_MSG = 'Providing Reference_No/Order No is mandatory'
