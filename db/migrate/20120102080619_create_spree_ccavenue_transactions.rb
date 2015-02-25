@@ -5,7 +5,7 @@ class CreateSpreeCcavenueTransactions < ActiveRecord::Migration
       t.integer :payment_method_id
       t.string :transaction_number
       t.string :ccavenue_order_number
-      t.decimal :amount, :precision => 8, :scale => 2
+      t.decimal :amount, :precision => 10, :scale => 2
       t.string :currency
       t.string :ccavenue_amount
       t.string :state
