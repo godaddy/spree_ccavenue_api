@@ -1,7 +1,14 @@
 source 'https://rubygems.org'
 
-group :test do
+group :development, :test do
+  gem 'rails', '~> 4.0.5'
   gem 'rspec-rails'
+  gem 'factory_girl_rails', '~> 4.0'
+  gem 'awesome_print'
+  gem 'simplecov-rcov'
+  gem 'yarjuf'
+  gem 'require_all'
+  gem 'byebug'
 end
 
 gem 'spree', github: 'godaddy/spree', branch: '2-2-nemo-stable'
