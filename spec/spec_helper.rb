@@ -1,3 +1,16 @@
+if ENV["COVERAGE"]
+  require_relative 'rcov_exclude_list.rb'
+  exlist = Dir.glob(@exclude_list)
+  require 'simplecov'
+  require 'simplecov-rcov'
+  SimpleCov.formatter = SimpleCov::Formatter::RcovFormatter
+  SimpleCov.start do
+    exlist.each do |p|
+      add_filter p
+    end
+  end
+end
+
 # Configure Rails Environment
 ENV["RAILS_ENV"] = "test"
 
@@ -46,4 +59,9 @@ end
 
 def spree
   Spree::Core::Engine.routes.url_helpers
+end
+
+if ENV["COVERAGE"]
+  # Load all files except the ones in exclude list
+  require_all(Dir.glob('**/*.rb') - exlist)
 end
