@@ -10,7 +10,8 @@ module Spree
     def show
       begin
         cc_transaction = provider.build_ccavenue_checkout_transaction(order)
-      rescue
+      rescue => e
+        log_error(e)
         flash[:error] = Spree.t('ccavenue.generic_failed')
         redirect_to checkout_state_path(:payment)
       end
@@ -55,12 +56,16 @@ module Spree
         end
       end
     rescue => e
-      Rails.logger.error "Error onr edirect from Ccavenue: #{e.message}"
+      log_error(e)
       flash[:error] = Spree.t('ccavenue.checkout_payment_error')
       redirect_to checkout_state_path(current_order.state)
     end
 
     private
+
+    def log_error(e)
+      Rails.logger.error "Error onr edirect from Ccavenue: #{e.message}"
+    end
 
     def completion_route(order)
       order_path(order)

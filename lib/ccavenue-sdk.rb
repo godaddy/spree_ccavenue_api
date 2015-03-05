@@ -17,9 +17,6 @@ module CcavenueApi
 
     def decrypt(data)
       AESCrypter.decrypt(data, @encryption_key)
-    rescue OpenSSL::Cipher::CipherError => e
-      Rails.logger.error "Error decrypting data #{e.message}"
-      return nil
     end
   end
 
