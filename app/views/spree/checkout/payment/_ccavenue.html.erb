@@ -4,5 +4,5 @@
   </span>
   <br>
 
-  <%= link_to(image_tag('http://www.ccavenue.com/images/460.gif'), ccavenue_order_confirmation_path(payment_method, order_id: @order.id), :method => :post, :id => 'ccavenue_button') %>
+  <%= link_to(image_tag('http://www.ccavenue.com/images/460.gif'), ccavenue_order_confirmation_path(payment_method), :method => :post, :id => 'ccavenue_button') %>
 </fieldset>
