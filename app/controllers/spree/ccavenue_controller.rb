@@ -46,17 +46,25 @@ module Spree
         if order.complete?
           flash.notice = Spree.t('ccavenue.order_processed_successfully')
           session[:order_id] = nil
+          flash[:order_completed] = true
           redirect_to completion_route(order)
         else
+          flash[:error] = Spree.t('ccavenue.payment_failed') if transaction.failed?
+          flash[:error] = Spree.t('ccavenue.payment_aborted') if transaction.aborted?
           redirect_to checkout_state_path(order.state)
         end
       end
-    rescue
-      flash[:error] = Spree.t(:checkout_payment_error)
+    rescue => e
+      Rails.logger.error "Error onr edirect from Ccavenue: #{e.message}"
+      flash[:error] = Spree.t('ccavenue.checkout_payment_error')
       redirect_to checkout_state_path(current_order.state)
     end
 
     private
+
+    def completion_route(order)
+      order_path(order)
+    end
 
     # override for delayed job
     def void_payment(*args)
@@ -85,29 +93,29 @@ module Spree
 
     def ccavenue_redirect_params(order, transaction)
       ba = order.bill_address
-      sa = order.ship_address
+      sa = order.ship_address || order.bill_address
       order_data = {
-          order_id:         [order.number, '-', transaction.id].join,
+          order_id:         transaction.gateway_order_number(order),
           amount:           order.total.to_s,
           currency:         order.currency,
-          promo_code:       order.coupon_code
+          promo_code:       order.coupon_code,
 
           billing_name:     ba.full_name,
-          billing_address:  ba.address,
+          billing_address:  ba.address1,
           billing_city:     ba.city,
           billing_state:    ba.state.try(:name) || ba.state_name,
           billing_zip:      ba.zipcode,
           billing_country:  ba.country.name,
-          billing_phone:    ba.phone,
+          billing_tel:    ba.phone,
           billing_email:    order.email,
 
-          delivery_name:    sa.full_name
-          delivery_address: sa.address,
+          delivery_name:    sa.full_name,
+          delivery_address: sa.address1,
           delivery_city:    sa.city,
           delivery_state:   sa.state.try(:name) || sa.state_name,
           delivery_zip:     sa.zipcode,
           delivery_country: sa.country.name,
-          delivery_phone:   sa.phone,
+          delivery_tel:   sa.phone,
 
           redirect_url:     redirect_url(transaction)
       }
@@ -116,7 +124,7 @@ module Spree
           merchant_id:          provider.merchant_id,
           access_code:          provider.access_code,
           transaction_url:      provider.transaction_url,
-          enc_request:          provider.build_encrypted_request(transaction, data)
+          enc_request:          provider.build_encrypted_request(transaction, order_data)
       }
     end
   end

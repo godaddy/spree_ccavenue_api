@@ -1,4 +1,5 @@
-require 'rack'
+require 'rack/utils'
+require 'rest-client'
 require 'aes_crypter'
 
 module CcavenueApi
@@ -14,8 +15,11 @@ module CcavenueApi
       AESCrypter.encrypt(data, @encryption_key)
     end
 
-    def self.decrypt(data)
+    def decrypt(data)
       AESCrypter.decrypt(data, @encryption_key)
+    rescue OpenSSL::Cipher::CipherError => e
+      Rails.logger.error "Error decrypting data #{e.message}"
+      return nil
     end
   end
 
@@ -55,8 +59,8 @@ module CcavenueApi
     def initialize(opts)
       @test_mode = opts[:test_mode] || true
 
-      @transaction_url = opts[:transaction_url] || (@test_mode ? default_transaction_url : production_transaction_url)
-      @api_url         = opts[:api_url] || (@test_mode ? default_api_url : production_api_url)
+      @transaction_url = opts[:transaction_url] || (@test_mode ? self.class.default_transaction_url : self.class.production_transaction_url)
+      @api_url         = opts[:api_url] || (@test_mode ? self.class.default_api_url : self.class.production_api_url)
       @merchant_id     = opts[:merchant_id]
       @access_code     = opts[:access_code]
       @encryption_key  = opts[:encryption_key]
@@ -79,16 +83,16 @@ module CcavenueApi
 
     def build_encrypted_request(transaction, order_data={})
       request_params = order_data.merge({
-                                          merchant_id : merchant_id,
-        cancel_url : '',
-        language : 'EN',
-        merchant_param1 : nil,
-        merchant_param2 : nil,
-        merchant_param3 : nil,
-        merchant_param4 : nil,
-        merchant_param5 : nil,
-      })
-      req = crypter.encrypt(request_params.to_query)
+                                          merchant_id:     merchant_id,
+                                          cancel_url:      '',
+                                          language:        'EN',
+                                          merchant_param1: nil,
+                                          merchant_param2: nil,
+                                          merchant_param3: nil,
+                                          merchant_param4: nil,
+                                          merchant_param5: nil,
+                                        })
+      req            = crypter.encrypt(request_params.to_query)
       Rails.logger.debug "Encrypting params: #{request_params.inspect} to #{req}"
       req
     end
@@ -110,18 +114,18 @@ module CcavenueApi
     def validate_merchant_credentials(new_access_code, new_encryption_key)
       #stash old creds and crypter
       @old_access_code = @access_code; @old_encryption_key = @encryption_key
-      @old_crypter = @crypter; @old_req_builder = @req_builder
+      @old_crypter     = @crypter; @old_req_builder = @req_builder
 
       # init SDK with new merchant credentials
       init_from_merchant_credentials(new_access_code, new_encryption_key)
-      build_and_invoke_api_request(transaction) do
-        data = {reference_no: '', order_no: ''}.to_json  # empty order id
-        req_builder.order_status(data)
-      end
+      data     = {reference_no: '', order_no: ''}.to_json # empty order id
+      response = api_request(req_builder.order_status(data))
+      Rails.logger.info "Received following API validation response: #{response.inspect}"
+      response
     ensure
       # restore old creds back
       @access_code = @old_access_code; @encryption_key = @old_encryption_key
-      @crypter = @old_crypter; @req_builder = @old_req_builder
+      @crypter     = @old_crypter; @req_builder = @old_req_builder
     end
 
     #############
@@ -130,7 +134,7 @@ module CcavenueApi
     def build_and_invoke_api_request(transaction)
       raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
       response = api_request(yield)
-      Rails.logger.info "Received following API cancel response: #{response.inspect} for ccave transaction #{transaction.id}"
+      Rails.logger.info "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
       response
     end
 
@@ -181,19 +185,19 @@ module CcavenueApi
     end
 
     def api_request(payload)
-      http_response = RestClient::Request.execute(method:     :post, url: api_url, payload: payload,
-                                                  headers:    {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
-                                                  verify_ssl: !test_mode)
-      Response.successful_http_request(http_response, crypter)
-    rescue RestClient::RequestTimeout, RestClient::Exception, RuntimeError => error
+      http_response = ::RestClient::Request.execute(method:     :post, url: api_url, payload: payload,
+                                                    headers:    {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
+                                                    verify_ssl: !test_mode)
+      Response.successful_http_request(Rack::Utils.parse_query(http_response), crypter)
+    rescue ::RestClient::RequestTimeout, ::RestClient::Exception, RuntimeError => error
       return Response.failed_http_request(error.message, crypter)
     end
 
   end
 
   ################################
+  ################################
   class RequestBuilder
-    ################################
 
     attr_reader :access_code, :crypter
 
@@ -229,59 +233,71 @@ module CcavenueApi
   end
 
   ################################
+  ################################
   class Response
-    ################################
 
     class << self
-      def self.failed_http_request(payload, decrypter)
-        ApiResponse.new(:reason => payload, :http_status => :failed, :original_payload => payload)
+      def failed_http_request(payload, decrypter)
+        self.new(:reason => payload, :http_status => :failed, :original_payload => payload)
       end
 
-      def self.successful_http_request(encrypted_payload, decrypter)
-        Rails.logger.debug "Encrypted response: #{encrypted_payload}"
+      def successful_http_request(api_response, decrypter)
+        Rails.logger.debug "Received api response: #{api_response}"
 
-        decrypted_payload = decrypter.decrypt(encrypted_payload.gsub('\r\n', '').strip)
-        Rails.logger.debug "Decrypted response: #{decrypted_payload}"
-        decrypted_hash = ActiveSupport::JSON.decode(decrypted_payload)
+        if api_response["status"] && api_response["status"] == "1"
+          self.new(:reason           => api_response["enc_response"],
+                   :http_status      => :failed,
+                   :api_status       => :failed,
+                   :original_payload => api_response
+          )
+        else
+          decrypted_payload = decrypter.decrypt(api_response['enc_response'].gsub('\r\n', '').strip)
+          Rails.logger.debug "Decrypted response: #{decrypted_payload}"
 
-        parsed = build_from_response(decrypted_hash)
-        ApiResponse.new({:http_status => :success, :original_payload => decrypted_hash).merge(parsed))
+          decrypted_hash = ActiveSupport::JSON.decode(decrypted_payload)
+          parsed         = build_from_response(decrypted_hash)
+          self.new({
+                     :http_status      => :success,
+                     :api_status       => :success,
+                     :original_payload => decrypted_hash
+                   }.merge(parsed))
+        end
       end
 
       # the keys of this hash are the attributes of the response
-      def self.build_from_response(response)
-        hsh = {
-          api_status: (response['status'] == '0' || response['status'] === 0) ? :success : :failed
-        }
-        if response['Refund_Order_Result']
-          hsh.merge({
-                      refund_status: response['Refund_Order_Result']['refund_status'],
-                      reason:        response['Refund_Order_Result']['reason'] # Only present for failed requests
-                    })
-        elsif response['Order_Status_Result']
-          hsh.merge({
-                      order_status:           response['Order_Status_Result']['order_status'], # Only present for failed requests
-                      order_status_date_time: response['Order_Status_Result']['order_status_date_time'], # Only present for failed requests
-                      reason:                 response['Order_Status_Result']['error_desc'] # Only present for failed requests
-                    })
-        elsif response['Order_Result']
-          hsh.merge({success_count: response['Order_Result']['success_count']})
-          if response['Order_Result']['failed_List']
-            reason = response['Order_Result']['failed_List']['failed_order'].first['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
-            hsh.merge({reason: reason})
-          end
-        else
-          raise ArgumentError.new 'Unknown response type'
-        end
+      def build_from_response(response)
+        hsh = if response['Refund_Order_Result']
+                {
+                  refund_status: response['Refund_Order_Result']['refund_status'],
+                  reason:        response['Refund_Order_Result']['reason'] # Only present for failed requests
+                }
+                # "{\"Order_Status_Result\":{\"status\":1,\"error_desc\":\"Providing Reference_No/Order No is mandatory.\"}}"
+              elsif response['Order_Status_Result']
+                {
+                  request_status:         (response['Order_Status_Result']['status'] == 0) ? :success : :failed,
+                  reason:                 response['Order_Status_Result']['error_desc'], # Only present for failed requests
+                  order_status:           response['Order_Status_Result']['order_status'],
+                  order_status_date_time: response['Order_Status_Result']['order_status_date_time']
+                }
+              elsif response['Order_Result']
+                tmp = {success_count: response['Order_Result']['success_count']}
+                if response['Order_Result']['failed_List']
+                  reason = response['Order_Result']['failed_List']['failed_order'].first['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
+                  tmp[:reason] = reason
+                end
+                tmp
+              else
+                raise ArgumentError.new 'Unknown response type'
+              end
+
+        return hsh
       rescue => e
         Rails.logger.error("Error parsing ccavenue api response: #{e.message}")
-        hsh = {
+        return {
           reason:     Spree.t("ccavenue.api_response_parse_failed"),
           api_status: :failed
         }
       end
-
-      hsh
     end
 
     ################################
@@ -291,14 +307,14 @@ module CcavenueApi
       opts = HashWithIndifferentAccess.new(opts)
       # see build_from_response for the list of attributes e.g. reason, status_count
       opts.keys.each do |key|
-        self.instance_variable_set(:"@{key}", opts[key])
+        self.instance_variable_set("@#{key}".to_sym, opts[key])
       end
     end
 
     # an api request can fail in transport
     # or it can be a business fail
     def success?
-      self.http_status == :success && self.api_status == :success
+      self.http_status == :success && self.api_status == :success && self.request_status == :success
     end
 
     ### cancel api response
@@ -327,12 +343,13 @@ module CcavenueApi
 
     ### merchant credentials validation
     VALIDATION_SUCCESS_MSG = 'Providing Reference_No/Order No is mandatory'
+
     def credentials_valid?
-      self.http_status == :success && (!@reason.blank? && @reason =~ /#{VALIDATION_SUCCESS_MSG}/)
+      self.http_status == :success && self.api_status == :success && (!@reason.blank? && @reason =~ /#{VALIDATION_SUCCESS_MSG}/)
     end
 
     def credentials_validation_error
-      @reason
+      @reason.blank? ? Spree.t('ccavenue.unknown_api_error') : @reason
     end
 
     def authorization

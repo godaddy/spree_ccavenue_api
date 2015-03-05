@@ -56,7 +56,7 @@ module Spree
       else
         class << source
           def to_s
-            errors.join(" ")
+            transaction_errors.join("\n")
           end
         end
         source
