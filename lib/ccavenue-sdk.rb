@@ -143,7 +143,8 @@ module CcavenueApi
     # succeed, we try refunding the payment
     def void!(transaction)
       response = self.cancel!(transaction)
-      self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
+      response = self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
+      response
     end
 
     def cancel!(transaction)
