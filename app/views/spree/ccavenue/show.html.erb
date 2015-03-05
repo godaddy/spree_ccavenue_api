@@ -5,23 +5,15 @@
     <div class="<%= css_class_based_on_order_state(@order) %>">
       <div class="clear"></div>
       <div class="checkout_form">
-        <%= form_tag @payment_method.url do %>
-          <%
-             merchant_id     = @payment_method.preferred_merchant_id
-             access_code     = @payment_method.preferred_access_code
-             encryption_key  = @payment_method.preferred_encryption_key
-             redirect_url    = gateway_ccavenue_callback_url(@transaction, :protocol => 'http')
-             enc_request     = encrypted_request(@payment_method, @transaction, @order, redirect_url, encryption_key)
-          %>
-
+        <%= form_tag @redirect_params[:transaction_url] do %>
           <%= hidden_field_tag 'command',                      'initiateTransaction' %>
           <%= hidden_field_tag 'Instant Gratification',        'Y' %>
-          <%= hidden_field_tag 'merchant_id',                  merchant_id %>
-          <%= hidden_field_tag 'access_code',                  access_code %>
-          <%= hidden_field_tag 'encRequest',                   enc_request %>
+          <%= hidden_field_tag 'merchant_id',                  @redirect_params[:merchant_id] %>
+          <%= hidden_field_tag 'access_code',                  @redirect_params[:access_code] %>
+          <%= hidden_field_tag 'encRequest',                   @redirect_params[:enc_request] %>
 
           <%= render :partial => 'spree/checkout/confirm' %>
-          <p style="margin: 10px 0;"><%= Spree.t(:ccavenue_instructional_text) %></p><br/>
+          <p style="margin: 10px 0;"><%= Spree.t('ccavenue.instructional_text') %></p><br/>
         <% end %>
       </div>
     </div>
