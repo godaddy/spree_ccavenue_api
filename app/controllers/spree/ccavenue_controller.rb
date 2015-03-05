@@ -27,6 +27,17 @@ module Spree
 
       provider.update_transaction_from_redirect_response(transaction, params['encResp'])
 
+      unless transaction.success?
+        if transaction.failed?
+          flash[:error] = Spree.t('ccavenue.payment_failed')
+        elsif transaction.aborted?
+          flash[:error] = Spree.t('ccavenue.payment_aborted')
+        else
+          flash[:error] = Spree.t('ccavenue.generic_failed')
+        end
+        redirect_to checkout_state_path(order.state) and return
+      end
+
       if order.insufficient_stock_lines.present?
         Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{transaction.tracking_id} since out of stock"
         if void_payment(transaction)
@@ -50,8 +61,6 @@ module Spree
           flash[:order_completed] = true
           redirect_to completion_route(order)
         else
-          flash[:error] = Spree.t('ccavenue.payment_failed') if transaction.failed?
-          flash[:error] = Spree.t('ccavenue.payment_aborted') if transaction.aborted?
           redirect_to checkout_state_path(order.state)
         end
       end
@@ -93,7 +102,7 @@ module Spree
       ccavenue_callback_url(payment_method,
                             :order_id => order.id,
                             :transaction_id => transaction.id,
-                            :protocol => 'http')
+                            :protocol => 'https')
     end
 
     def ccavenue_redirect_params(order, transaction)
