@@ -33,7 +33,7 @@ describe Spree::CcavenueController, :type => :controller do
     context 'successful #show' do
       before do
         allow(controller).to receive(:current_order).at_least(:once).and_return(order)
-        controller.stub :ccavenue_redirect_params => {}
+        allow(controller).to receive(:ccavenue_redirect_params).and_return({})
       end
       it 'renders show' do
         get :show, :id => ccavenue.id, :use_route => 'spree'

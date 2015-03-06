@@ -37,7 +37,7 @@ module CcavenueApi
         default:    "https://180.179.175.17/web/registration.do?command=navigateSchemeForm"
       }
     }
-    # ccavenue_transaction_url, ccavenue_api_url, ccavenue_signup_url
+
     class << self
       URLS.keys.each do |url_type|
         [:production, :default].each do |server_mode|
@@ -159,7 +159,7 @@ module CcavenueApi
         data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.amount.to_s}]}.to_json
         req_builder.refund_order(data)
       end
-      Rails.logger.info %Q!Refund api request returned #{response.refund_successful? ? 'successfully' : "with a failure #'{response.reason}'"}!
+      Rails.logger.info %Q!Refund api request returned #{response.refund_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end
 
@@ -317,7 +317,7 @@ module CcavenueApi
     # an api request can fail in transport
     # or it can be a business fail
     def success?
-      req_status = @request_status.blank? ? true : (self.request_status == :success)
+      req_status = @request_status.blank? ? true : (@request_status == :success)
       self.http_status == :success && self.api_status == :success && req_status
     end
 
