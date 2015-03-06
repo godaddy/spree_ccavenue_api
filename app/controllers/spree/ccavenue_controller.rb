@@ -9,17 +9,17 @@ module Spree
     # show confirmation page
     def show
       cc_transaction           = provider.build_ccavenue_checkout_transaction(order)
-      @order, @redirect_params = order, ccavenue_redirect_params(order, cc_transaction)
+      @redirect_params = ccavenue_redirect_params(order, cc_transaction)
     rescue => e
       log_error(e)
       flash[:error] = Spree.t('ccavenue.generic_failed')
-      redirect_to (e.kind_of?(ActiveRecord::RecordNotFound) ? spree.cart_path : checkout_state_path(:payment))
+      redirect_to (@order.nil? ? spree.cart_path : checkout_state_path(:payment))
     end
 
     # return from ccavenue
     def callback
       Rails.logger.debug "Received transaction from CCAvenue #{params.inspect}"
-      transaction            = Spree::Ccavenue::Transaction.find(params[:transaction_id]) || raise(ActiveRecord::RecordNotFound)
+      transaction            = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
       session[:order_id]     ||= params[:order_id]
       session[:access_token] = order.guest_token if order.respond_to?(:guest_token)
 
@@ -39,11 +39,11 @@ module Spree
       if order.insufficient_stock_lines.present?
         Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{transaction.tracking_id} since out of stock"
         if void_payment(transaction)
-          flash[:error] = Spree.t(:checkout_low_inventory_after_payment_warning)
+          flash[:error] = Spree.t('ccavenue.checkout_low_inventory_after_payment_warning')
         else
           flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
         end
-        # TODO update order to void
+        # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items
         redirect_to spree.cart_path and return
       else
         order.payments.create!({
@@ -65,10 +65,14 @@ module Spree
     rescue => e
       log_error(e)
       flash[:error] = Spree.t('ccavenue.checkout_payment_error')
-      redirect_to checkout_state_path(current_order.state)
+      redirect_to @order.nil? ? spree.cart_path : checkout_state_path(current_order.state)
     end
 
     private
+
+    def ccavenue_transaction
+      Spree::Ccavenue::Transaction.find(params[:transaction_id])
+    end
 
     def log_error(e)
       Rails.logger.error "Error onr edirect from Ccavenue: #{e.message}"
@@ -85,7 +89,7 @@ module Spree
     end
 
     def order
-      current_order || raise(ActiveRecord::RecordNotFound)
+      (@order ||= current_order) || raise(ActiveRecord::RecordNotFound)
     end
 
     def payment_method

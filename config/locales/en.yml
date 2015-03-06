@@ -19,3 +19,4 @@ en:
       ccavenue_order_number: "Order number at CCAvenue"
       card_category: "Card Category"
       auth_desc: "Auth Desc (Authorization)"
+      checkout_low_inventory_after_payment_warning: "Your payment is not processed because an item in your cart has become unavailable."
