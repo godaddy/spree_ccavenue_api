@@ -1,4 +1,3 @@
-require 'ccavenue-sdk'
 module Spree
   class Gateway::Ccavenue < Gateway
 

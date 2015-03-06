@@ -98,7 +98,7 @@ module CcavenueApi
       cc_params = Rack::Utils.parse_nested_query(crypter.decrypt(encrypted_response))
       Rails.logger.info "Decrypted params from ccavenue #{cc_params.inspect}"
       transaction.update_attributes!(
-        :auth_desc             => cc_params['order_status'],
+        :auth_desc             => test_mode ? 'Success' : cc_params['order_status'],
         :card_category         => cc_params['card_name'],
         :ccavenue_order_number => cc_params['order_id'],
         :tracking_id           => cc_params['tracking_id'],
@@ -131,7 +131,7 @@ module CcavenueApi
     def build_and_invoke_api_request(transaction)
       raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
       response = api_request(yield)
-      Rails.logger.info "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
+      Rails.logger.debug "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
       response
     end
 
@@ -141,21 +141,26 @@ module CcavenueApi
     def void!(transaction)
       response = self.cancel!(transaction)
       response = self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
+      Rails.logger.info %Q!Void api request returned #{response.void_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end
 
     def cancel!(transaction)
-      build_and_invoke_api_request(transaction) do
+      response = build_and_invoke_api_request(transaction) do
         data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.amount.to_s}]}.to_json
         req_builder.cancel_order(data)
       end
+      Rails.logger.info %Q!Cancel api request returned #{response.cancel_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
+      response
     end
 
     def refund!(transaction)
-      build_and_invoke_api_request(transaction) do
+      response = build_and_invoke_api_request(transaction) do
         data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.amount.to_s}]}.to_json
         req_builder.refund_order(data)
       end
+      Rails.logger.info %Q!Refund api request returned #{response.refund_successful? ? 'successfully' : "with a failure #'{response.reason}'"}!
+      response
     end
 
     #####################################
@@ -279,7 +284,7 @@ module CcavenueApi
                 }
               elsif response['Order_Result']
                 tmp = {success_count: response['Order_Result']['success_count']}
-                if response['Order_Result']['failed_List']
+                if response['Order_Result']['failed_List'] && !response['Order_Result']['failed_List'].blank?
                   reason = response['Order_Result']['failed_List']['failed_order'].first['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
                   tmp[:reason] = reason
                 end
@@ -312,7 +317,8 @@ module CcavenueApi
     # an api request can fail in transport
     # or it can be a business fail
     def success?
-      self.http_status == :success && self.api_status == :success && self.request_status == :success
+      req_status = @request_status.blank? ? true : (self.request_status == :success)
+      self.http_status == :success && self.api_status == :success && req_status
     end
 
     ### cancel api response
@@ -322,7 +328,7 @@ module CcavenueApi
 
     ### refund api response
     def refund_successful?
-      self.success?
+      self.success? && check_if_string_or_number(@refund_status, 0) && @reason.blank?
     end
 
     ### void api response
@@ -354,5 +360,14 @@ module CcavenueApi
       "#{@reason} #{@refund_status}"
     end
 
+    def reason
+      @reason.to_s
+    end
+
+    private
+
+    def check_if_string_or_number(var, val)
+      var === val.to_s || var === val
+    end
   end
 end
