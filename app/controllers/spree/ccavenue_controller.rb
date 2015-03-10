@@ -49,7 +49,7 @@ module Spree
         # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items
         redirect_to spree.cart_path
       else
-        flash[:error] = e.is_a?(Spree::Core::GatewayError) ? e.message : Spree.t('ccavenue.checkout_payment_error')
+        flash[:error] = Spree.t('ccavenue.checkout_payment_error')
         redirect_to @order.nil? ? spree.cart_path : checkout_state_path(current_order.state)
       end
     end
