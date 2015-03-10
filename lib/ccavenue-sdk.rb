@@ -56,9 +56,9 @@ module CcavenueApi
     def initialize(opts)
       @test_mode = opts[:test_mode] || true
 
-      @transaction_url = opts[:transaction_url] || (@test_mode ? self.class.default_transaction_url : self.class.production_transaction_url)
-      @api_url         = opts[:api_url] || (@test_mode ? self.class.default_api_url : self.class.production_api_url)
-      @signup_url      = opts[:signup_url] || (@test_mode ? self.class.default_signup_url : self.class.production_signup_url)
+      @transaction_url = opts[:transaction_url].present? ? opts[:transaction_url] : (@test_mode ? self.class.default_transaction_url : self.class.production_transaction_url)
+      @api_url         = opts[:api_url].present? ? opts[:api_url] : (@test_mode ? self.class.default_api_url : self.class.production_api_url)
+      @signup_url      = opts[:signup_url].present? ? opts[:signup_url] : (@test_mode ? self.class.default_signup_url : self.class.production_signup_url)
       @merchant_id     = opts[:merchant_id]
       @access_code     = opts[:access_code]
       @encryption_key  = opts[:encryption_key]
