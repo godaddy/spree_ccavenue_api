@@ -28,7 +28,11 @@ module Spree
       payment = order.payments.create!({
                                          :source         => transaction,
                                          :amount         => order.total,
-                                         :payment_method => payment_method
+                                         :payment_method => payment_method,
+                                         # we set the response code here itself, since when there is no more
+                                         # stock, order.next doesn't invoke payment.purchase! and as a result
+                                         # the response_code never gets set
+                                         :response_code  => transaction.tracking_id
                                        })
       order.next
       if order.complete?
@@ -42,8 +46,6 @@ module Spree
     rescue => e
       log_error(e)
       if e.respond_to?(:record) && e.record.errors.added?(:count_on_hand, I18n.t('errors.messages.greater_than_or_equal_to', count: 0))
-        Rails.logger.error "Error encountered due to one or more items running out of stock for order #{order.id}"
-
         void!(payment)
 
         # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items

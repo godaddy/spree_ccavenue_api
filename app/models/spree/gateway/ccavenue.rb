@@ -48,25 +48,30 @@ module Spree
     #############################
     #  purchase  reflects the source (Spree::Ccavenue::Transaction) status instead of making an api call
     def purchase(amount, transaction, options={})
-      if transaction.success?
+      ret = if transaction.success?
         ActiveMerchant::Billing::Response.new(true, Spree.t('ccavenue.order_processed_successfully'), {},
                                               :test => self.preferred_test_mode, :authorization => transaction.tracking_id)
       else
         ActiveMerchant::Billing::Response.new(false, Spree.t('ccavenue.generic_failed'), { :message => transaction.transaction_error },
                                               :test => self.preferred_test_mode)
       end
+      Rails.logger.debug "Returning from ccavenue#purchase: #{ret.inspect}"
+      ret
     end
 
     # payment profiles are supported
     def void(tracking_id, options={})
+      Rails.logger.debug "tracking id #{tracking_id}"
       response = provider.void!(tracking_id)
-      if response.void_successful?
+      ret = if response.void_successful?
         ActiveMerchant::Billing::Response.new(true, Spree.t('ccavenue.void_successful'), {},
                                               :test => self.preferred_test_mode, :authorization => tracking_id)
       else
         ActiveMerchant::Billing::Response.new(false, Spree.t('ccavenue.void_failed'), { :message => response.reason },
                                               :test => self.preferred_test_mode)
       end
+      Rails.logger.debug "Returning from ccavenue#void: #{ret.inspect}"
+      ret
     end
 
     # since we don't use the Gateway interface to make any of the calls below
