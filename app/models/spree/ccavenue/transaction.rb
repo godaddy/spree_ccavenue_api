@@ -13,11 +13,11 @@ module Spree
       self.auth_desc && self.auth_desc == 'Success'
     end
 
-    def transaction_errors
-      return [] if success?
-      return [Spree.t('ccavenue.payment_failed')] if failed?
-      return [Spree.t('ccavenue.payment_aborted')] if aborted?
-      [Spree.t('ccavenue.generic_failed')]
+    def transaction_error
+      return nil if success?
+      return Spree.t('ccavenue.payment_failed') if failed?
+      return Spree.t('ccavenue.payment_aborted') if aborted?
+      Spree.t('ccavenue.generic_failed')
     end
 
     def gateway_order_number(order)

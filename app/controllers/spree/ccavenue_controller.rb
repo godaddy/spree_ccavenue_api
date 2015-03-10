@@ -73,7 +73,7 @@ module Spree
     end
 
     def log_error(e)
-      Rails.logger.error "Error onr edirect from Ccavenue: #{e.message}"
+      Rails.logger.error "Error on redirect from Ccavenue: #{e.message}"
     end
 
     def completion_route(order)

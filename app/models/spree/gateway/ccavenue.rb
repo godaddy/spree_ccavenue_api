@@ -52,7 +52,7 @@ module Spree
         ActiveMerchant::Billing::Response.new(true, Spree.t('ccavenue.order_processed_successfully'), {},
                                               :test => self.preferred_test_mode, :authorization => transaction.tracking_id)
       else
-        ActiveMerchant::Billing::Response.new(false, Spree.t('ccavenue.generic_failed'), { :message => transaction.transaction_errors },
+        ActiveMerchant::Billing::Response.new(false, Spree.t('ccavenue.generic_failed'), { :message => transaction.transaction_error },
                                               :test => self.preferred_test_mode)
       end
     end
