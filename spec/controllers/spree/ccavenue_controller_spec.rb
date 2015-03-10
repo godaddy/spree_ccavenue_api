@@ -1,32 +1,34 @@
 require 'spec_helper'
 describe Spree::CcavenueController, :type => :controller do
-  # stub_authorization!
-
   let(:order) { FactoryGirl.create(:order_with_totals) }
 
   let(:routes) { Spree::Core::Engine.routes.url_helpers }
 
-  let!(:ccavenue) { Spree::Gateway::Ccavenue.create!(:name => 'ccavenue') }
+  let!(:ccavenue_gw) { Spree::Gateway::Ccavenue.create!(:name        => 'ccavenue test gw',
+                                                     environment: Rails.env) }
 
-  let(:merchant_id) { '9999' }
-  let(:enc_key) { '8728jdjdd' }
-  let(:access_code) { '3421' }
+  let(:merchant_id) { '1234' }
+  let(:enc_key) { 'test#test' }
+  let(:access_code) { '1234' }
   let(:transaction_url) { 'http://1234' }
-  let(:dummy_encrypted_val) { 'aaabbbb' }
-  let(:ccavenue_provider) { double('provider',
-                                   merchant_id:     merchant_id,
-                                   access_code:     access_code,
-                                   encryption_key:  enc_key,
-                                   transaction_url: transaction_url
-  ) }
+  let(:dummy_encrypted_val) { 'testingtestingtesting' }
+  let(:ccavenue_provider) { CcavenueApi::SDK.new(merchant_id:     merchant_id,
+                                                 access_code:     access_code,
+                                                 encryption_key:  enc_key,
+                                                 transaction_url: transaction_url) }
   let(:ccavenue_transaction) { double('ccave_transaction', id: 123, tracking_id: '123') }
-  let(:ccavenue_response) { double('ccavnue_response') }
+  let(:successful_ccavenue_transaction) { Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Success') }
+  let(:failed_ccavenue_transaction) { Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Failure') }
+  let(:aborted_ccavenue_transaction) { Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Aborted') }
+  let(:ccavenue_response) { double('ccavenue_response') }
 
   let(:encResp) { '123' }
 
   before do
     order.state = 'payment'
     order.save!
+    allow(controller).to receive(:payment_method).and_return(ccavenue_gw)
+    allow(ccavenue_gw).to receive(:provider).and_return(ccavenue_provider)
   end
 
   context '#show' do
@@ -36,11 +38,11 @@ describe Spree::CcavenueController, :type => :controller do
         allow(controller).to receive(:ccavenue_redirect_params).and_return({})
       end
       it 'renders show' do
-        get :show, :id => ccavenue.id, :use_route => 'spree'
+        get :show, :id => ccavenue_gw.id, :use_route => 'spree'
         expect(response).to render_template("show")
       end
       it "creates a transaction" do
-        expect { get :show, :id => ccavenue.id, :use_route => 'spree' }.to change { Spree::Ccavenue::Transaction.count }.by(1)
+        expect { get :show, :id => ccavenue_gw.id, :use_route => 'spree' }.to change { Spree::Ccavenue::Transaction.count }.by(1)
       end
     end
 
@@ -48,7 +50,7 @@ describe Spree::CcavenueController, :type => :controller do
       before do
         allow(controller).to receive(:current_order).at_least(:once).and_return(nil)
         allow(controller).to receive(:current_spree_user).at_least(:once).and_return(nil)
-        get :show, :id => ccavenue.id, :use_route => 'spree'
+        get :show, :id => ccavenue_gw.id, :use_route => 'spree'
       end
       it "redirects to cart" do
         expect(response).to redirect_to routes.cart_path
@@ -72,7 +74,7 @@ describe Spree::CcavenueController, :type => :controller do
         expect(controller).to receive(:provider).at_least(:once).and_return(ccavenue_provider)
       end
       it "compiles and encrypts ccavenue params" do
-        get :show, :id => ccavenue.id, :use_route => 'spree'
+        get :show, :id => ccavenue_gw.id, :use_route => 'spree'
         expect(assigns[:redirect_params]).to eq({:merchant_id     => merchant_id,
                                                  :access_code     => access_code,
                                                  :transaction_url => transaction_url,
@@ -84,7 +86,7 @@ describe Spree::CcavenueController, :type => :controller do
 
   context '#callback' do
     def do_post
-      post :callback, :id  => ccavenue.id,
+      post :callback, :id  => ccavenue_gw.id,
            :transaction_id => ccavenue_transaction.id,
            :order_id       => order.id,
            :encResp        => encResp,
@@ -92,52 +94,13 @@ describe Spree::CcavenueController, :type => :controller do
     end
 
     before do
-      allow(controller).to receive(:ccavenue_transaction).and_return(ccavenue_transaction)
       allow(controller).to receive(:provider).at_least(:once).and_return(ccavenue_provider)
       allow(ccavenue_provider).to receive(:update_transaction_from_redirect_response).and_return(nil)
     end
 
-    context "on successful ccavenue transaction" do
-      before do
-        expect(controller).to receive(:current_order).at_least(:once).and_return(order)
-        expect(ccavenue_transaction).to receive(:success?).and_return(true)
-      end
-      context "when the order is successfully completed" do
-        before do
-          expect(order).to receive(:insufficient_stock_lines).and_return(false)
-          expect(order).to receive(:payments).and_return(double('payments', create!: double('payment')))
-          expect(order).to receive(:next).and_return(nil)
-          expect(order).to receive(:complete?).and_return(true)
-        end
-        it 'redirects to order completion route' do
-          do_post
-          expect(response).to redirect_to routes.order_path(order)
-          expect(flash[:notice]).to eq(Spree.t('ccavenue.order_processed_successfully'))
-        end
-      end
-
-      context "when the inventory goes low" do
-        before do
-          expect(order).to receive(:insufficient_stock_lines).and_return(true)
-        end
-
-        it "redirects to the cart with a flash message" do
-          allow(controller).to receive(:void_payment).and_return(true)
-          do_post
-          expect(response).to redirect_to routes.cart_path
-          expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_low_inventory_after_payment_warning'))
-        end
-
-        it "invokes the void api call to ccavenue" do
-          expect(ccavenue_provider).to receive(:void!).and_return(double('void_response', :void_successful? => true))
-          do_post
-          expect(response).to redirect_to routes.cart_path
-        end
-      end
-    end
-
     context "when current_order is nil" do
       before do
+        allow(controller).to receive(:ccavenue_transaction).and_return(successful_ccavenue_transaction)
         expect(controller).to receive(:current_order).at_least(:once).and_return(nil)
       end
 
@@ -148,16 +111,76 @@ describe Spree::CcavenueController, :type => :controller do
       end
     end
 
+    context "when the transaction does not exist on the store side" do
+      before do
+        expect(controller).to receive(:ccavenue_transaction).and_return(nil)
+        expect(controller).to receive(:current_order).at_least(:once).and_return(order)
+      end
+
+      pending "redirects to cart with the correct flash message" do
+        do_post
+        expect(response).to redirect_to routes.cart_path
+        expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_payment_error'))
+      end
+    end
+
+
+    context "on successful ccavenue transaction" do
+      before do
+        expect(controller).to receive(:current_order).at_least(:once).and_return(order)
+        allow(controller).to receive(:ccavenue_transaction).and_return(successful_ccavenue_transaction)
+      end
+      context "when the order is successfully completed" do
+        it 'redirects to order completion route' do
+          do_post
+          expect(response).to redirect_to routes.order_path(order)
+          expect(flash[:notice]).to eq(Spree.t('ccavenue.order_processed_successfully'))
+        end
+        pending 'sets the order and the payment in correct state' do
+          expect(order.state).to eq('complete')
+          expect(order.payments.first.state).to eq('completed')
+        end
+      end
+
+      context "when the inventory goes low" do
+        before do
+          Spree::StockItem.update_all backorderable: false
+        end
+
+        pending "redirects to the cart with a flash message" do
+          do_post
+          expect(response).to redirect_to routes.cart_path
+          expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_low_inventory_after_payment_warning'))
+        end
+
+        pending "voids the payment" do
+          expect(ccavenue_provider).to receive(:void!).and_return(true)
+          do_post
+          expect(order.payments.first.state).to eq('void')
+          expect(order.state).to eq('void')
+          expect(response).to redirect_to routes.cart_path
+        end
+
+        pending "redirects with appropriate flash message when void fails" do
+          expect(controller).to receive(:void_payment).and_raise(Spree::Core::GatewayError 'some err msg')
+          do_post
+          expect(order.payments.first.state).to eq('void')
+          expect(order.state).to eq('void')
+          expect(flash[:error]).to be_nil
+          expect(response).to redirect_to routes.cart_path
+        end
+      end
+    end
+
+
     context 'when payment is aborted at ccavenue' do
       before do
         expect(controller).to receive(:current_order).at_least(:once).and_return(order)
-        expect(ccavenue_transaction).to receive(:success?).and_return(false)
-        expect(ccavenue_transaction).to receive(:failed?).and_return(false)
-        expect(ccavenue_transaction).to receive(:aborted?).and_return(true)
+        allow(controller).to receive(:ccavenue_transaction).and_return(aborted_ccavenue_transaction)
         do_post
       end
 
-      it 'redirects to checkout payment page' do
+      pending 'redirects to checkout payment page' do
         expect(response).to redirect_to routes.checkout_state_path('payment')
       end
     end
@@ -165,12 +188,11 @@ describe Spree::CcavenueController, :type => :controller do
     context 'when payment fails at ccavenue' do
       before do
         expect(controller).to receive(:current_order).at_least(:once).and_return(order)
-        expect(ccavenue_transaction).to receive(:success?).and_return(false)
-        expect(ccavenue_transaction).to receive(:failed?).and_return(true)
+        allow(controller).to receive(:ccavenue_transaction).and_return(failed_ccavenue_transaction)
         do_post
       end
 
-      it 'redirects to checkout payment page' do
+      pending 'redirects to checkout payment page' do
         expect(response).to redirect_to routes.checkout_state_path('payment')
       end
 

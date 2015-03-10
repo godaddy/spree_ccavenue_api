@@ -50,7 +50,7 @@ module CcavenueApi
 
     #################################### instance
 
-    attr_reader :transaction_url, :api_url,
+    attr_reader :transaction_url, :api_url, :signup_url,
                 :merchant_id, :access_code, :encryption_key, :test_mode
 
     def initialize(opts)
@@ -58,6 +58,7 @@ module CcavenueApi
 
       @transaction_url = opts[:transaction_url] || (@test_mode ? self.class.default_transaction_url : self.class.production_transaction_url)
       @api_url         = opts[:api_url] || (@test_mode ? self.class.default_api_url : self.class.production_api_url)
+      @signup_url      = opts[:signup_url] || (@test_mode ? self.class.default_signup_url : self.class.production_signup_url)
       @merchant_id     = opts[:merchant_id]
       @access_code     = opts[:access_code]
       @encryption_key  = opts[:encryption_key]
@@ -98,7 +99,7 @@ module CcavenueApi
       cc_params = Rack::Utils.parse_nested_query(crypter.decrypt(encrypted_response))
       Rails.logger.info "Decrypted params from ccavenue #{cc_params.inspect}"
       transaction.update_attributes!(
-        :auth_desc             => test_mode ? 'Success' : cc_params['order_status'],
+        :auth_desc             => cc_params['order_status'],
         :card_category         => cc_params['card_name'],
         :ccavenue_order_number => cc_params['order_id'],
         :tracking_id           => cc_params['tracking_id'],
@@ -128,17 +129,11 @@ module CcavenueApi
     #############
     # API stuff
 
-    def build_and_invoke_api_request(transaction)
-      raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
-      response = api_request(yield)
-      Rails.logger.debug "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
-      response
-    end
-
     # we actually do a cancel first and then a refund since CCavenue maintains a state on its own side
     # and at this point we are not sure what their state is. We try canceling first and if that doesn't
     # succeed, we try refunding the payment
-    def void!(transaction)
+    def void!(tracking_id)
+      transaction = ccavenue_transaction_class.find_by_tracking_id(tracking_id) || raise(ActiveRecord::RecordNotFound)
       response = self.cancel!(transaction)
       response = self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
       Rails.logger.info %Q!Void api request returned #{response.void_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
@@ -163,22 +158,22 @@ module CcavenueApi
       response
     end
 
-    #####################################
-    private
-
     def crypter
-      if @encryption_key
-        @crypter ||= Crypter.new(@encryption_key)
+      if encryption_key
+        @crypter ||= Crypter.new(encryption_key)
       end
       @crypter
     end
 
     def req_builder
-      if @access_code && @encryption_key
-        @req_builder ||= RequestBuilder.new(@access_code, crypter)
+      if access_code && encryption_key
+        @req_builder ||= RequestBuilder.new(access_code, crypter)
       end
       @req_builder
     end
+
+    #####################################
+    private
 
     def init_from_merchant_credentials(new_access_code, new_encryption_key)
       @access_code    = new_access_code
@@ -196,16 +191,23 @@ module CcavenueApi
       return Response.failed_http_request(error.message, crypter)
     end
 
+    def build_and_invoke_api_request(transaction)
+      raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
+      response = api_request(yield)
+      Rails.logger.debug "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
+      response
+    end
+
+
   end
 
   ################################
   ################################
   class RequestBuilder
 
-    attr_reader :access_code, :crypter
+    attr_reader :crypter
 
     def initialize(access_code, crypter)
-      @access_code = access_code
       @crypter     = crypter
       @defaultHash = {
         request_type: 'JSON',
@@ -249,7 +251,7 @@ module CcavenueApi
 
         if api_response["status"] && api_response["status"] == "1"
           self.new(:reason           => api_response["enc_response"],
-                   :http_status      => :failed,
+                   :http_status      => :success,
                    :api_status       => :failed,
                    :original_payload => api_response
           )
@@ -269,21 +271,24 @@ module CcavenueApi
 
       # the keys of this hash are the attributes of the response
       def build_from_response(response)
-        hsh = if response['Refund_Order_Result']
-                {
-                  refund_status: response['Refund_Order_Result']['refund_status'],
-                  reason:        response['Refund_Order_Result']['reason'] # Only present for failed requests
-                }
+        hsh = if response['Refund_Order_Result']  # refund response
+                tmp = {refund_status: (check_if_equal(response['Refund_Order_Result']['refund_status'], 0)) ? :success : :failed, }
+                if response['Refund_Order_Result']['reason'] # Only present for failed requests
+                  tmp[:reason] = response['Refund_Order_Result']['reason']
+                end
+                tmp
                 # "{\"Order_Status_Result\":{\"status\":1,\"error_desc\":\"Providing Reference_No/Order No is mandatory.\"}}"
-              elsif response['Order_Status_Result']
-                {
-                  request_status:         (response['Order_Status_Result']['status'] == 0) ? :success : :failed,
-                  reason:                 response['Order_Status_Result']['error_desc'], # Only present for failed requests
-                  order_status:           response['Order_Status_Result']['order_status'],
+              elsif response['Order_Status_Result'] # order status response
+                tmp          = {
+                  request_status:         (check_if_equal(response['Order_Status_Result']['status'], 0)) ? :success : :failed,
+                  order_status:           (check_if_equal(response['Order_Status_Result']['order_status'], 0)) ? :success : :failed,
                   order_status_date_time: response['Order_Status_Result']['order_status_date_time']
                 }
-              elsif response['Order_Result']
-                tmp = {success_count: response['Order_Result']['success_count']}
+                tmp[:reason] = response['Order_Status_Result']['error_desc'] if response['Order_Status_Result']['error_desc']
+                tmp
+              elsif response['Order_Result']  # cancel response
+                success_count = Integer(response['Order_Result']['success_count']) rescue nil
+                tmp = {success_count: success_count}
                 if response['Order_Result']['failed_List'] && !response['Order_Result']['failed_List'].blank?
                   reason = response['Order_Result']['failed_List']['failed_order'].first['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
                   tmp[:reason] = reason
@@ -300,6 +305,10 @@ module CcavenueApi
           reason:     Spree.t("ccavenue.api_response_parse_failed"),
           api_status: :failed
         }
+      end
+
+      def check_if_equal(var, val)
+        var === val.to_s || var === val
       end
     end
 
@@ -323,22 +332,26 @@ module CcavenueApi
 
     ### cancel api response
     def cancel_successful?
+      return false if @success_count.blank?
       self.success? && @success_count > 0
     end
 
     ### refund api response
     def refund_successful?
-      self.success? && check_if_string_or_number(@refund_status, 0) && @reason.blank?
+      return false if @refund_status.blank?
+      self.success? && @refund_status == :success && @reason.blank?
     end
 
     ### void api response
     def void_successful?
-      self.cancel_successful? || self.refund_successful?
+      return true if self.cancel_successful?
+      self.refund_successful?
     end
 
     ### status api response
     def order_status
-      @order_status
+      return false if @order_status.blank?
+      self.success? && @order_status == :success
     end
 
     def order_status_updated_at
@@ -349,7 +362,8 @@ module CcavenueApi
     VALIDATION_SUCCESS_MSG = 'Providing Reference_No/Order No is mandatory'
 
     def credentials_valid?
-      self.http_status == :success && self.api_status == :success && (!@reason.blank? && @reason =~ /#{VALIDATION_SUCCESS_MSG}/)
+      valid_reason = @reason.match(/#{VALIDATION_SUCCESS_MSG}/) unless @reason.blank?
+      self.http_status == :success && self.api_status == :success && valid_reason.present?
     end
 
     def credentials_validation_error
@@ -365,9 +379,9 @@ module CcavenueApi
     end
 
     private
-
-    def check_if_string_or_number(var, val)
-      var === val.to_s || var === val
+    def check_if_equal(var, val)
+      self.class.check_if_equal(var, val)
     end
+
   end
 end

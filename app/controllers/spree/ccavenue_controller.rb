@@ -8,7 +8,7 @@ module Spree
 
     # show confirmation page
     def show
-      cc_transaction           = provider.build_ccavenue_checkout_transaction(order)
+      cc_transaction   = provider.build_ccavenue_checkout_transaction(order)
       @redirect_params = ccavenue_redirect_params(order, cc_transaction)
     rescue => e
       log_error(e)
@@ -18,57 +18,55 @@ module Spree
 
     # return from ccavenue
     def callback
-      Rails.logger.debug "Received transaction from CCAvenue #{params.inspect}"
+      Rails.logger.debug "Received callback from CCAvenue #{params.inspect}"
       transaction            = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
       session[:order_id]     ||= params[:order_id]
       session[:access_token] = order.guest_token if order.respond_to?(:guest_token)
 
       provider.update_transaction_from_redirect_response(transaction, params['encResp'])
 
-      unless transaction.success?
-        if transaction.failed?
-          flash[:error] = Spree.t('ccavenue.payment_failed')
-        elsif transaction.aborted?
-          flash[:error] = Spree.t('ccavenue.payment_aborted')
-        else
-          flash[:error] = Spree.t('ccavenue.generic_failed')
-        end
-        redirect_to checkout_state_path(order.state) and return
-      end
-
-      if order.insufficient_stock_lines.present?
-        Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{transaction.tracking_id} since out of stock"
-        if void_payment(transaction)
-          flash[:error] = Spree.t('ccavenue.checkout_low_inventory_after_payment_warning')
-        else
-          flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
-        end
-        # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items
-        redirect_to spree.cart_path and return
+      payment = order.payments.create!({
+                                         :source         => transaction,
+                                         :amount         => order.total,
+                                         :payment_method => payment_method
+                                       })
+      order.next
+      if order.complete?
+        flash.notice            = Spree.t('ccavenue.order_processed_successfully')
+        session[:order_id]      = nil
+        redirect_to completion_route(order)
       else
-        order.payments.create!({
-                                 :source         => transaction,
-                                 :amount         => order.total,
-                                 :payment_method => payment_method
-                               })
-
-        order.next
-        if order.complete?
-          flash.notice            = Spree.t('ccavenue.order_processed_successfully')
-          session[:order_id]      = nil
-          flash[:order_completed] = true
-          redirect_to completion_route(order)
-        else
-          redirect_to checkout_state_path(order.state)
-        end
+        flash[:error] = order.errors ? order.errors.full_messages.first : Spree.t('ccavenue.generic_failed')
+        redirect_to checkout_state_path(order.state)
       end
     rescue => e
       log_error(e)
-      flash[:error] = Spree.t('ccavenue.checkout_payment_error')
-      redirect_to @order.nil? ? spree.cart_path : checkout_state_path(current_order.state)
+      if e.respond_to?(:record) && e.record.errors.added?(:count_on_hand, I18n.t('errors.messages.greater_than_or_equal_to', count: 0))
+        Rails.logger.error "Error encountered due to one or more items running out of stock for order #{order.id}"
+
+        void!(payment)
+
+        # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items
+        redirect_to spree.cart_path
+      else
+        flash[:error] = e.is_a?(Spree::Core::GatewayError) ? e.message : Spree.t('ccavenue.checkout_payment_error')
+        redirect_to @order.nil? ? spree.cart_path : checkout_state_path(current_order.state)
+      end
     end
 
     private
+
+    def void!(payment)
+      Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock"
+      if void_payment(payment)
+        flash[:error] = Spree.t('ccavenue.checkout_low_inventory_after_payment_warning')
+      else
+        flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
+      end
+    rescue => e
+      Rails.logger.error "Error encountered voiding payment/#{payment.id} for order/#{order.id} - #{e.message}"
+      flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
+    end
 
     def ccavenue_transaction
       Spree::Ccavenue::Transaction.find(params[:transaction_id])
@@ -83,9 +81,8 @@ module Spree
     end
 
     # override for delayed job
-    def void_payment(*args)
-      response = provider.void!(*args)
-      response.void_successful?
+    def void_payment(payment)
+      payment.void_transaction!
     end
 
     def order
