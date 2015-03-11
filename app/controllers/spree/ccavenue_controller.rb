@@ -45,7 +45,7 @@ module Spree
       end
     rescue => e
       log_error(e)
-      if e.respond_to?(:record) && e.record.errors.added?(:count_on_hand, I18n.t('errors.messages.greater_than_or_equal_to', count: 0))
+      if out_of_stock_error(e)
         void!(payment)
 
         # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items
@@ -58,6 +58,11 @@ module Spree
 
     private
 
+    def out_of_stock_error(e)
+      e.respond_to?(:record) && e.record.errors.added?(:count_on_hand, I18n.t('errors.messages.greater_than_or_equal_to', count: 0))
+    end
+
+    # so we can catch exceptions while voiding
     def void!(payment)
       Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock"
       if void_payment(payment)
@@ -66,7 +71,7 @@ module Spree
         flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
       end
     rescue => e
-      Rails.logger.error "Error encountered voiding payment/#{payment.id} for order/#{order.id} - #{e.message}"
+      Rails.logger.error "Error #{e.class} encountered voiding payment/#{payment.id} for order/#{order.id} - #{e.message}"
       flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
     end
 
@@ -75,7 +80,7 @@ module Spree
     end
 
     def log_error(e)
-      Rails.logger.error "Error on redirect from Ccavenue: #{e.message}"
+      Rails.logger.error "Error #{e.class} on redirect from Ccavenue: #{e.message}"
     end
 
     def completion_route(order)

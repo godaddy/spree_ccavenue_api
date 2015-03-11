@@ -114,10 +114,9 @@ describe Spree::CcavenueController, :type => :controller do
     context "when the transaction does not exist on the store side" do
       before do
         expect(controller).to receive(:ccavenue_transaction).and_return(nil)
-        expect(controller).to receive(:current_order).at_least(:once).and_return(order)
       end
 
-      pending "redirects to cart with the correct flash message" do
+      it "redirects to cart with the correct flash message" do
         do_post
         expect(response).to redirect_to routes.cart_path
         expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_payment_error'))
@@ -136,38 +135,30 @@ describe Spree::CcavenueController, :type => :controller do
           expect(response).to redirect_to routes.order_path(order)
           expect(flash[:notice]).to eq(Spree.t('ccavenue.order_processed_successfully'))
         end
-        pending 'sets the order and the payment in correct state' do
-          expect(order.state).to eq('complete')
-          expect(order.payments.first.state).to eq('completed')
-        end
       end
 
       context "when the inventory goes low" do
         before do
-          Spree::StockItem.update_all backorderable: false
+          expect(order).to receive(:next).and_raise
+          expect(controller).to receive(:out_of_stock_error).and_return(true)
         end
-
-        pending "redirects to the cart with a flash message" do
-          do_post
-          expect(response).to redirect_to routes.cart_path
-          expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_low_inventory_after_payment_warning'))
+        context "and the void call succeeds" do
+          before do
+            expect(controller).to receive(:void_payment).and_return(true)
+          end
+          it "redirects to the cart with a flash message" do
+            do_post
+            expect(response).to redirect_to routes.cart_path
+            expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_low_inventory_after_payment_warning'))
+          end
         end
-
-        pending "voids the payment" do
-          expect(ccavenue_provider).to receive(:void!).and_return(true)
-          do_post
-          expect(order.payments.first.state).to eq('void')
-          expect(order.state).to eq('void')
-          expect(response).to redirect_to routes.cart_path
-        end
-
-        pending "redirects with appropriate flash message when void fails" do
-          expect(controller).to receive(:void_payment).and_raise(Spree::Core::GatewayError 'some err msg')
-          do_post
-          expect(order.payments.first.state).to eq('void')
-          expect(order.state).to eq('void')
-          expect(flash[:error]).to be_nil
-          expect(response).to redirect_to routes.cart_path
+        context "and the void call fails" do
+          it "redirects with appropriate flash message when void fails" do
+            expect(controller).to receive(:void_payment).and_return(false)
+            do_post
+            expect(flash[:error]).to eq(Spree.t('ccavenue.refund_api_call_failed'))
+            expect(response).to redirect_to routes.cart_path
+          end
         end
       end
     end
@@ -177,10 +168,12 @@ describe Spree::CcavenueController, :type => :controller do
       before do
         expect(controller).to receive(:current_order).at_least(:once).and_return(order)
         allow(controller).to receive(:ccavenue_transaction).and_return(aborted_ccavenue_transaction)
+        expect(order).to receive(:next).and_raise
+        expect(controller).to receive(:out_of_stock_error).and_return(false)
         do_post
       end
 
-      pending 'redirects to checkout payment page' do
+      it 'redirects to checkout payment page' do
         expect(response).to redirect_to routes.checkout_state_path('payment')
       end
     end
@@ -189,10 +182,12 @@ describe Spree::CcavenueController, :type => :controller do
       before do
         expect(controller).to receive(:current_order).at_least(:once).and_return(order)
         allow(controller).to receive(:ccavenue_transaction).and_return(failed_ccavenue_transaction)
+        expect(order).to receive(:next).and_raise
+        expect(controller).to receive(:out_of_stock_error).and_return(false)
         do_post
       end
 
-      pending 'redirects to checkout payment page' do
+      it 'redirects to checkout payment page' do
         expect(response).to redirect_to routes.checkout_state_path('payment')
       end
 
