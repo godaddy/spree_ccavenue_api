@@ -119,7 +119,7 @@ module CcavenueApi
       data     = {reference_no: '', order_no: ''}.to_json # empty order id
       response = api_request(req_builder.order_status(data))
       Rails.logger.info "Received following API validation response: #{response.inspect}"
-      response
+      response.credentials_valid?
     ensure
       # restore old creds back
       @access_code = @old_access_code; @encryption_key = @old_encryption_key
@@ -289,9 +289,10 @@ module CcavenueApi
               elsif response['Order_Result']  # cancel response
                 success_count = Integer(response['Order_Result']['success_count']) rescue nil
                 tmp = {success_count: success_count}
-                if response['Order_Result']['failed_List'] && !response['Order_Result']['failed_List'].blank?
-                  reason = response['Order_Result']['failed_List']['failed_order'].first['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
-                  tmp[:reason] = reason
+                if response['Order_Result']['failed_List'] && (response['Order_Result']['failed_List']['failed_order']).kind_of?(Hash)
+                  tmp[:reason] = response['Order_Result']['failed_List']['failed_order']['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
+                elsif response['Order_Result']['failed_List'] && (response['Order_Result']['failed_List']['failed_order']).kind_of?(Array)
+                  tmp[:reason] = ((response['Order_Result']['failed_List']['failed_order']).first)['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
                 end
                 tmp
               else

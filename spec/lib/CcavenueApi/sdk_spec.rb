@@ -89,7 +89,7 @@ describe CcavenueApi::SDK do
     let(:new_encryption_key) { double('new encryption key') }
     let(:req_builder) { double('req builder') }
     before do
-      expect(sdk).to receive(:api_request).and_return(double('api_response'))
+      expect(sdk).to receive(:api_request).and_return(double('api_response', :credentials_valid? => true))
       expect(sdk).to receive(:req_builder).and_return(req_builder)
       allow(req_builder).to receive(:order_status).and_return('123')
     end

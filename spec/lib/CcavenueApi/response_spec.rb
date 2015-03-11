@@ -4,7 +4,8 @@ describe CcavenueApi::Response do
   let(:failed_http_payload) { {"status" => "1", "enc_response" => "1234"} }
   let(:crypter) { CcavenueApi::Crypter.new('123') }
   let(:success_cancel_response) { {"Order_Result" => {"success_count" => 0}} }
-  let(:fail_cancel_response) { {"Order_Result" => {"success_count" => "1", "failed_List" => {"failed_order" => [{"reason" => 'failed cancel'}]}}} }
+  let(:fail_cancel_response) { {"Order_Result" => {"success_count" => "1", "failed_List" => {"failed_order" => {"reason" => 'failed cancel'}}}} }
+  let(:fail_cancel_response2) { {"Order_Result" => {"success_count" => "1", "failed_List" => {"failed_order" => [{"reason" => 'failed cancel'}]}}} }
   let(:success_refund_response) { {"Refund_Order_Result" => {"refund_status" => 0}} }
   let(:fail_refund_response) { {"Refund_Order_Result" => {"refund_status" => "1", "reason" => 'failed refund'}} }
   let(:success_order_response) {  {"Order_Status_Result" => { "status" => 0, "order_status" => "0", "order_status_date_time" => '123' }} }
@@ -39,6 +40,9 @@ describe CcavenueApi::Response do
     end
     it "parses failed cancel response properly" do
       expect(CcavenueApi::Response.build_from_response(fail_cancel_response)).to eq({success_count: 1, reason: 'failed cancel'})
+    end
+    it "parses failed cancel response 2 properly" do
+      expect(CcavenueApi::Response.build_from_response(fail_cancel_response2)).to eq({success_count: 1, reason: 'failed cancel'})
     end
     it "parses successful refund response properly" do
       expect(CcavenueApi::Response.build_from_response(success_refund_response)).to eq({refund_status: :success})
