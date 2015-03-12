@@ -1,11 +1,11 @@
 Spree::Core::Engine.routes.draw do
-  match '/gateway/:order_id/ccavenue/:payment_method_id' => 'ccavenue#show', :as => :gateway_ccavenue, via: [:get, :post]
-  match '/gateway/ccavenue/:id/callback' => 'ccavenue#callback', :as => :gateway_ccavenue_callback, via: [:get, :post]
+  get '/ccavenue/:id/show' => 'ccavenue#show', :as => :ccavenue_order_confirmation
+  post '/ccavenue/:id/callback/:order_id/:transaction_id' => 'ccavenue#callback', :as => :ccavenue_callback
 
   namespace :admin do
     resources :payment_methods do
       member do
-        get :verify
+        get :ccavenue_verify
       end
     end
   end

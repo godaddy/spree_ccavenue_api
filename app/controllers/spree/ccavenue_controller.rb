@@ -1,97 +1,150 @@
-require 'api_caller'
-
 module Spree
   class CcavenueController < StoreController
 
     skip_before_filter :verify_authenticity_token, only: :callback
-    helper 'spree/orders' # we need this to avoid undefined method truncated_product_description in frontend. Details on: https://coveralls.io/builds/769164
+    # we need this to avoid undefined method truncated_product_description in frontend. Details on: https://coveralls.io/builds/769164
+    helper 'spree/orders'
+    ssl_required
 
-    ssl_allowed
-
+    # show confirmation page
     def show
-      @payment_method = Spree::PaymentMethod.find(params[:payment_method_id])
-      @order = current_order
-      if @order.has_authorized_ccavenue_transaction?
-        flash[:error] = Spree.t('order_number_already_authorized', order_number: @order.number)
-        render :error
-        return
-      end
-
-      @order.cancel_existing_ccavenue_transactions!
-      @order.payments.destroy_all
-      @order.payments.build(:amount => @order.total, :payment_method_id => @payment_method.id)
-      @transaction = @order.ccavenue_transactions.build(:amount => @order.total,
-                                                        :currency => @order.currency.to_s,
-                                                        :payment_method_id => @payment_method.id)
-
-      @transaction.transact
-      @order.save!
-      raise Spree.t('order_not_saved', order: @order.inspect) unless @order.persisted?
-      logger.info("Sending order #{@order.number} to CCAvenue via transaction id #{@transaction.id}")
-      @bill_address, @ship_address = @order.bill_address, (@order.ship_address || @order.bill_address)
+      cc_transaction   = provider.build_ccavenue_checkout_transaction(order)
+      @redirect_params = ccavenue_redirect_params(order, cc_transaction)
+    rescue => e
+      log_error(e)
+      flash[:error] = Spree.t('ccavenue.generic_failed')
+      redirect_to (@order.nil? ? spree.cart_path : checkout_state_path(:payment))
     end
 
+    # return from ccavenue
     def callback
-      @transaction = Spree::Ccavenue::Transaction.find(params[:id])
-      raise Spree.t('transaction_not_found', id: params[:id]) unless @transaction
+      Rails.logger.debug "Received callback from CCAvenue #{params.inspect}"
+      transaction            = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
+      session[:order_id]     ||= params[:order_id]
+      session[:access_token] = order.guest_token if order.respond_to?(:guest_token)
 
-      params = decrypt_ccavenue_response_params
-      logger.info "Decrypted params from CCAvenue #{params.inspect}"
-      @transaction.auth_desc = params['order_status']
-      @transaction.card_category = params['card_name']
-      @transaction.ccavenue_order_number = params['order_id']
-      @transaction.tracking_id = params['tracking_id']
-      @transaction.ccavenue_amount = params['amount']
+      provider.update_transaction_from_redirect_response(transaction, params['encResp'])
 
-      session[:access_token] = @transaction.order.guest_token if @transaction.order.respond_to?(:guest_token)
-      session[:order_id] = @transaction.order.id
-
-      if @transaction.order.insufficient_stock_lines.present?
-        response = @transaction.void
-        render Spree.t('refund_failed', reason: response.reason) and return unless response.success?
-        update_order_payment_state(@transaction.order)
-        redirect_to edit_order_path(@transaction.order), :notice => Spree.t("payment_not_processed")
-        return
-      end
-      if @transaction.next
-        handle_successful_transaction
+      payment = order.payments.create!({
+                                         :source         => transaction,
+                                         :amount         => order.total,
+                                         :payment_method => payment_method,
+                                         # we set the response code here itself, since when there is no more
+                                         # stock, order.next doesn't invoke payment.purchase! and as a result
+                                         # the response_code never gets set
+                                         :response_code  => transaction.tracking_id
+                                       })
+      order.next
+      if order.complete?
+        flash.notice            = Spree.t('ccavenue.order_processed_successfully')
+        session[:order_id]      = nil
+        redirect_to completion_route(order)
       else
-        render 'error'
+        flash[:error] = order.errors ? order.errors.full_messages.first : Spree.t('ccavenue.generic_failed')
+        redirect_to checkout_state_path(order.state)
       end
+    rescue => e
+      log_error(e)
+      if out_of_stock_error(e)
+        void!(payment)
 
+        redirect_to spree.cart_path
+      else
+        flash[:error] = Spree.t('ccavenue.checkout_payment_error')
+        redirect_to @order.nil? ? spree.cart_path : checkout_state_path(current_order.state)
+      end
     end
 
     private
 
-    def handle_successful_transaction
-      if @transaction.authorized? # Successful
-        session[:order_id] = nil
-        flash.notice = Spree.t(:order_processed_successfully)
-        flash[:commerce_tracking] = 'nothing special'
-        # We are setting token here so that even if the URL is copied and reused later on the completed order page still gets displayed
-        if session[:access_token].nil?
-          redirect_to order_path(@transaction.order, {:checkout_complete => true})
-        else
-          redirect_to order_path(@transaction.order, {:checkout_complete => true, :token => session[:access_token]})
-        end
-      elsif @transaction.rejected?
-        redirect_to edit_order_path(@transaction.order), :error => Spree.t("payment_rejected")
-      elsif @transaction.canceled?
-        redirect_to edit_order_path(@transaction.order), :notice => Spree.t("payment_canceled")
-      elsif @transaction.initiated?
-        redirect_to edit_order_path(@transaction.order), :notice => Spree.t("payment_initiated")
+    def out_of_stock_error(e)
+      e.respond_to?(:record) && e.record.errors.added?(:count_on_hand, I18n.t('errors.messages.greater_than_or_equal_to', count: 0))
+    end
+
+    # so we can catch exceptions while voiding
+    def void!(payment)
+      Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock"
+      if void_payment(payment)
+        flash[:error] = Spree.t('ccavenue.checkout_low_inventory_after_payment_warning')
+      else
+        flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
       end
+    rescue => e
+      Rails.logger.error "Error #{e.class} encountered voiding payment/#{payment.id} for order/#{order.id} - #{e.message}"
+      flash[:error] = Spree.t('ccavenue.refund_api_call_failed')
     end
 
-    def update_order_payment_state(order)
-      order.update_column(:payment_state, 'void')
+    def ccavenue_transaction
+      Spree::Ccavenue::Transaction.find(params[:transaction_id])
     end
 
-    def decrypt_ccavenue_response_params
-      Rails.logger.info "Received transaction from CCAvenue #{params.inspect}"
-      encryption_key = @transaction.payment_method.preferred_encryption_key
-      query = AESCrypter.decrypt(params['encResp'], encryption_key)
-      Rack::Utils.parse_nested_query(query)
+    def log_error(e)
+      Rails.logger.error "Error #{e.class} on redirect from Ccavenue: #{e.message}"
+    end
+
+    def completion_route(order)
+      order_path(order)
+    end
+
+    # override for delayed job
+    def void_payment(payment)
+      payment.void_transaction!
+    end
+
+    def order
+      (@order ||= current_order) || raise(ActiveRecord::RecordNotFound)
+    end
+
+    def payment_method
+      Spree::PaymentMethod.find(params[:id])
+    end
+
+    def provider
+      payment_method.provider
+    end
+
+    def redirect_url(transaction)
+      ccavenue_callback_url(payment_method,
+                            :order_id       => order.id,
+                            :transaction_id => transaction.id,
+                            :protocol       => request.local? ? request.protocol : 'https')
+    end
+
+    def ccavenue_redirect_params(order, transaction)
+      ba         = order.bill_address
+      sa         = order.ship_address || order.bill_address
+      order_data = {
+        order_id:         transaction.gateway_order_number(order),
+        amount:           order.total.to_s,
+        currency:         order.currency,
+        promo_code:       order.coupon_code,
+
+        billing_name:     ba.full_name,
+        billing_address:  ba.address1,
+        billing_city:     ba.city,
+        billing_state:    ba.state.try(:name) || ba.state_name,
+        billing_zip:      ba.zipcode,
+        billing_country:  ba.country.name,
+        billing_tel:      ba.phone,
+        billing_email:    order.email,
+
+        delivery_name:    sa.full_name,
+        delivery_address: sa.address1,
+        delivery_city:    sa.city,
+        delivery_state:   sa.state.try(:name) || sa.state_name,
+        delivery_zip:     sa.zipcode,
+        delivery_country: sa.country.name,
+        delivery_tel:     sa.phone,
+
+        redirect_url:     redirect_url(transaction)
+      }
+
+      return {
+        merchant_id:     provider.merchant_id,
+        access_code:     provider.access_code,
+        transaction_url: provider.transaction_url,
+        enc_request:     provider.build_encrypted_request(transaction, order_data)
+      }
     end
   end
 end

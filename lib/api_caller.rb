@@ -1,3 +1,6 @@
+#################################
+# THIS WHOLE FILE IS DEPRECATED AND SHOULD NOT BE USED ANYMORE AS IT WILL BE REMOVED IN FUTURE VERSIONS
+##################################
 require 'rack'
 require 'aes_crypter'
 

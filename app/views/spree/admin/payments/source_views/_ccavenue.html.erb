@@ -1,19 +1,17 @@
-<% transactions = @payment.order.ccavenue_transactions %>
+<% transactions = [@payment.source] %>
 
 <% if transactions.any? %>
 <% transactions = transactions.reverse %>
 <table>
   <tr>
     <th><%= Spree.t('ccavenue.transaction') %></th>
-    <th><%= Spree.t('ccavenue.state') %></th>
     <th><%= Spree.t('ccavenue.ccavenue_order_number') %></th>
     <th><%= Spree.t('ccavenue.auth_desc') %></th>
     <th><%= Spree.t('ccavenue.card_category') %></th>
   </tr>
   <% transactions.each do |txn| %>
   <tr>
-    <td><%= txn.gateway_order_number %></td>
-    <td><%= txn.state %></td>
+    <td><%= txn.gateway_order_number(@order) %></td>
     <td><%= txn.ccavenue_order_number rescue '' %></td>
     <td><%= txn.auth_desc rescue '' %></td>
     <td><%= txn.card_category rescue '' %></td>
@@ -21,5 +19,5 @@
   <% end %>
 </table>
 <% else %>
-<p><%= Spree.t('no_transactions') %></p>
+<p><%= Spree.t('ccavenue.no_transactions') %></p>
 <% end %>
