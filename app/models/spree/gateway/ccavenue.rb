@@ -10,7 +10,7 @@ module Spree
 
 
     def supports?(source)
-      true if source.is_a? payment_source_class
+      source.is_a? payment_source_class
     end
 
     def payment_source_class

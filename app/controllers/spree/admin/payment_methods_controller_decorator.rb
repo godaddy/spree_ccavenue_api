@@ -5,9 +5,9 @@ Spree::Admin::PaymentMethodsController.class_eval do
     payment_method = Spree::PaymentMethod.find(params[:id])
 
     all_credentials_specified = params[:gateway_ccavenue] && (
-              !params[:gateway_ccavenue][:preferred_merchant_id].blank? &&
-              !params[:gateway_ccavenue][:preferred_access_code].blank? &&
-              !params[:gateway_ccavenue][:preferred_encryption_key].blank?
+              params[:gateway_ccavenue][:preferred_merchant_id].present? &&
+              params[:gateway_ccavenue][:preferred_access_code].present? &&
+              params[:gateway_ccavenue][:preferred_encryption_key].present?
     )
 
     respond_to do |format|

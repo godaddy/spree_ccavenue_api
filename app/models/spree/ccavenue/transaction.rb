@@ -2,15 +2,15 @@ module Spree
   class Ccavenue::Transaction < ActiveRecord::Base
 
     def failed?
-      self.auth_desc && self.auth_desc == 'Failure'
+      self.auth_desc == 'Failure'
     end
 
     def aborted?
-      self.auth_desc && self.auth_desc == 'Aborted'
+      self.auth_desc == 'Aborted'
     end
 
     def success?
-      self.auth_desc && self.auth_desc == 'Success'
+      self.auth_desc == 'Success'
     end
 
     def transaction_error

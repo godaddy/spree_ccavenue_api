@@ -48,7 +48,6 @@ module Spree
       if out_of_stock_error(e)
         void!(payment)
 
-        # TODO update order to void - not sure if we should void the order since we allow the user to drop the line items
         redirect_to spree.cart_path
       else
         flash[:error] = Spree.t('ccavenue.checkout_payment_error')
