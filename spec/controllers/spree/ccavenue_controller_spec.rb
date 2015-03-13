@@ -2,8 +2,6 @@ require 'spec_helper'
 describe Spree::CcavenueController, :type => :controller do
   let(:order) { FactoryGirl.create(:order_with_totals) }
 
-  let(:routes) { Spree::Core::Engine.routes.url_helpers }
-
   let!(:ccavenue_gw) { Spree::Gateway::Ccavenue.create!(:name        => 'ccavenue test gw',
                                                      environment: Rails.env) }
 
@@ -53,7 +51,7 @@ describe Spree::CcavenueController, :type => :controller do
         get :show, :id => ccavenue_gw.id, :use_route => 'spree'
       end
       it "redirects to cart" do
-        expect(response).to redirect_to routes.cart_path
+        expect(response).to redirect_to spree.cart_path
       end
       it "sets the correct flash error" do
         expect(flash[:error]).to eq(Spree.t('ccavenue.generic_failed'))
@@ -106,7 +104,7 @@ describe Spree::CcavenueController, :type => :controller do
 
       it "redirects to cart with the correct flash message" do
         do_post
-        expect(response).to redirect_to routes.cart_path
+        expect(response).to redirect_to spree.cart_path
         expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_payment_error'))
       end
     end
@@ -118,7 +116,7 @@ describe Spree::CcavenueController, :type => :controller do
 
       it "redirects to cart with the correct flash message" do
         do_post
-        expect(response).to redirect_to routes.cart_path
+        expect(response).to redirect_to spree.cart_path
         expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_payment_error'))
       end
     end
@@ -132,7 +130,7 @@ describe Spree::CcavenueController, :type => :controller do
       context "when the order is successfully completed" do
         it 'redirects to order completion route' do
           do_post
-          expect(response).to redirect_to routes.order_path(order)
+          expect(response).to redirect_to spree.order_path(order)
           expect(flash[:notice]).to eq(Spree.t('ccavenue.order_processed_successfully'))
         end
       end
@@ -148,7 +146,7 @@ describe Spree::CcavenueController, :type => :controller do
           end
           it "redirects to the cart with a flash message" do
             do_post
-            expect(response).to redirect_to routes.cart_path
+            expect(response).to redirect_to spree.cart_path
             expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_low_inventory_after_payment_warning'))
           end
         end
@@ -157,7 +155,7 @@ describe Spree::CcavenueController, :type => :controller do
             expect(controller).to receive(:void_payment).and_return(false)
             do_post
             expect(flash[:error]).to eq(Spree.t('ccavenue.refund_api_call_failed'))
-            expect(response).to redirect_to routes.cart_path
+            expect(response).to redirect_to spree.cart_path
           end
         end
       end
@@ -174,7 +172,7 @@ describe Spree::CcavenueController, :type => :controller do
       end
 
       it 'redirects to checkout payment page' do
-        expect(response).to redirect_to routes.checkout_state_path('payment')
+        expect(response).to redirect_to spree.checkout_state_path('payment')
       end
     end
 
@@ -188,7 +186,7 @@ describe Spree::CcavenueController, :type => :controller do
       end
 
       it 'redirects to checkout payment page' do
-        expect(response).to redirect_to routes.checkout_state_path('payment')
+        expect(response).to redirect_to spree.checkout_state_path('payment')
       end
 
     end
