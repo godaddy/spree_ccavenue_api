@@ -25,7 +25,7 @@ module CcavenueApi
     ################################
     URLS = {
       transaction: {
-        production: "https://secure.ccavenue.com/transaction/transaction.do",
+        production: "https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction",
         default:    "https://test.ccavenue.com/transaction/transaction.do"
       },
       api:         {
