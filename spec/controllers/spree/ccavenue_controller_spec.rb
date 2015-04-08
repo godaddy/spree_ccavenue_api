@@ -15,9 +15,18 @@ describe Spree::CcavenueController, :type => :controller do
                                                  encryption_key:  enc_key,
                                                  transaction_url: transaction_url) }
   let(:ccavenue_transaction) { double('ccave_transaction', id: 123, tracking_id: '123') }
-  let(:successful_ccavenue_transaction) { Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Success') }
-  let(:failed_ccavenue_transaction) { Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Failure') }
-  let(:aborted_ccavenue_transaction) { Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Aborted') }
+  let(:successful_ccavenue_transaction) {
+    Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Success', ccavenue_order_number: order.number, ccavenue_amount: order.total.to_s)
+  }
+  let(:changed_ccavenue_transaction) {
+    Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Success', ccavenue_order_number: order.number, ccavenue_amount: (order.total+1).to_s)
+  }
+  let(:failed_ccavenue_transaction) {
+    Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Failure', ccavenue_order_number: order.number, ccavenue_amount: order.total.to_s)
+  }
+  let(:aborted_ccavenue_transaction) {
+    Spree::Ccavenue::Transaction.create!(tracking_id: '123', auth_desc: 'Aborted', ccavenue_order_number: order.number, ccavenue_amount: order.total.to_s)
+  }
   let(:ccavenue_response) { double('ccavenue_response') }
 
   let(:encResp) { '123' }
@@ -85,14 +94,13 @@ describe Spree::CcavenueController, :type => :controller do
   context '#callback' do
     def do_post
       post :callback, :id  => ccavenue_gw.id,
-           :transaction_id => ccavenue_transaction.id,
-           :order_id       => order.id,
            :encResp        => encResp,
            :use_route      => 'spree'
     end
 
     before do
       allow(controller).to receive(:provider).at_least(:once).and_return(ccavenue_provider)
+      allow(ccavenue_provider).to receive(:parse_redirect_response).and_return({'order_id' => "#{order.number}-#{ccavenue_transaction.id}"})
       allow(ccavenue_provider).to receive(:update_transaction_from_redirect_response).and_return(nil)
     end
 
@@ -157,6 +165,19 @@ describe Spree::CcavenueController, :type => :controller do
             expect(flash[:error]).to eq(Spree.t('ccavenue.refund_api_call_failed'))
             expect(response).to redirect_to spree.cart_path
           end
+        end
+      end
+
+      context "when the order is changed" do
+        before do
+          allow(controller).to receive(:ccavenue_transaction).and_return(changed_ccavenue_transaction)
+          expect(controller).to receive(:void_payment).and_return(true)
+        end
+
+        it 'redirects to checkout payment page' do
+          do_post
+          expect(response).to redirect_to spree.checkout_state_path('payment')
+          expect(flash[:error]).to eq(Spree.t('ccavenue.checkout_payment_error'))
         end
       end
     end

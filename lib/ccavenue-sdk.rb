@@ -76,6 +76,7 @@ module CcavenueApi
     def build_ccavenue_checkout_transaction(order)
       ccavenue_transaction_class.create!(:amount   => order.total.to_s,
                                          :currency => order.currency.to_s,
+                                         :ccavenue_order_number => order.number
       )
     end
 
@@ -88,20 +89,22 @@ module CcavenueApi
                                           merchant_param2: nil,
                                           merchant_param3: nil,
                                           merchant_param4: nil,
-                                          merchant_param5: nil,
+                                          merchant_param5: nil
                                         })
       req            = crypter.encrypt(request_params.to_query)
       Rails.logger.debug "Encrypting params: #{request_params.inspect} to #{req}"
       req
     end
 
-    def update_transaction_from_redirect_response(transaction, encrypted_response)
-      cc_params = Rack::Utils.parse_nested_query(crypter.decrypt(encrypted_response))
+    def parse_redirect_response(encrypted_response)
+      Rack::Utils.parse_nested_query(crypter.decrypt(encrypted_response))
+    end
+
+    def update_transaction_from_redirect_response(transaction, cc_params)
       Rails.logger.info "Decrypted params from ccavenue #{cc_params.inspect}"
       transaction.update_attributes!(
         :auth_desc             => cc_params['order_status'],
         :card_category         => cc_params['card_name'],
-        :ccavenue_order_number => cc_params['order_id'],
         :tracking_id           => cc_params['tracking_id'],
         :ccavenue_amount       => cc_params['amount']
       )
