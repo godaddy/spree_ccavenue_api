@@ -8,10 +8,12 @@ describe CcavenueApi::SDK do
     :merchant_id     => merchant_id,
     :encryption_key  => enc_key,
     :access_code     => access_code,
-    :transaction_url => transaction_url,
-    :api_url         => api_url
   } }
-  let(:sdk) { CcavenueApi::SDK.new(sdk_args) }
+  let(:sdk) { CcavenueApi::SDK.new(sdk_args.merge({:transaction_url => transaction_url,
+                                                   :api_url         => api_url
+                                                  })) }
+  let(:test_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => true)) }
+  let(:prod_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => false)) }
   let(:order) { FactoryGirl.create(:order_with_totals) }
   let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123) }
   let(:crypter) { double('crypter') }
@@ -33,10 +35,24 @@ describe CcavenueApi::SDK do
     it "initializes the urls appropriately" do
       expect(sdk.transaction_url).to eq(transaction_url)
       expect(sdk.api_url).to eq(api_url)
-      expect(sdk.signup_url).to eq(CcavenueApi::SDK.default_signup_url)
+      expect(sdk.signup_url).to eq(CcavenueApi::SDK.production_signup_url)
     end
     it "initialzes the crypter" do
       expect(sdk.crypter).to be_kind_of(CcavenueApi::Crypter)
+    end
+    context "in test mode" do
+      it "initializes the urls correctly" do
+        expect(test_sdk.transaction_url).to eq(CcavenueApi::SDK.default_transaction_url)
+        expect(test_sdk.api_url).to eq(CcavenueApi::SDK.default_api_url)
+        expect(test_sdk.signup_url).to eq(CcavenueApi::SDK.default_signup_url)
+      end
+    end
+    context "in production mode" do
+      it "initializes the urls correctly" do
+        expect(prod_sdk.transaction_url).to eq(CcavenueApi::SDK.production_transaction_url)
+        expect(prod_sdk.api_url).to eq(CcavenueApi::SDK.production_api_url)
+        expect(prod_sdk.signup_url).to eq(CcavenueApi::SDK.production_signup_url)
+      end
     end
   end
 
