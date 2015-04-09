@@ -71,7 +71,7 @@ module Spree
 
     # so we can catch exceptions while voiding
     def void!(payment)
-      Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock"
+      Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock or incorrect order"
       if void_payment(payment)
         flash[:error] = Spree.t('ccavenue.checkout_low_inventory_after_payment_warning')
       else

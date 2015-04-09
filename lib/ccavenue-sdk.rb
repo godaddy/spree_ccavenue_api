@@ -54,7 +54,7 @@ module CcavenueApi
                 :merchant_id, :access_code, :encryption_key, :test_mode
 
     def initialize(opts)
-      @test_mode = opts[:test_mode] || true
+      @test_mode = opts[:test_mode].nil? ? false : opts[:test_mode]    # it hits production urls by default now and test is the forced mode
 
       @transaction_url = opts[:transaction_url].present? ? opts[:transaction_url] : (@test_mode ? self.class.default_transaction_url : self.class.production_transaction_url)
       @api_url         = opts[:api_url].present? ? opts[:api_url] : (@test_mode ? self.class.default_api_url : self.class.production_api_url)
