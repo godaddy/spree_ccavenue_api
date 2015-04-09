@@ -82,7 +82,7 @@ describe CcavenueApi::SDK do
     let(:transaction) { Spree::Ccavenue::Transaction.new(:amount => 100.0, :currency => :USD) }
     it "invokes crypter#decrypt" do
       expect(crypter).to receive(:decrypt).and_return(decResp = '123456')
-      sdk.update_transaction_from_redirect_response(transaction, double('encrypted_response'))
+      sdk.parse_redirect_response(double('encrypted_response'))
     end
     it "updates the transaction" do
       expect(crypter).to receive(:decrypt).and_return('123')
@@ -92,11 +92,10 @@ describe CcavenueApi::SDK do
       expect(transaction).to receive(:update_attributes!).with(
                                :auth_desc             => decodedResp['order_status'],
                                :card_category         => decodedResp['card_name'],
-                               :ccavenue_order_number => decodedResp['order_id'],
                                :tracking_id           => decodedResp['tracking_id'],
                                :ccavenue_amount       => decodedResp['amount']
                              )
-      sdk.update_transaction_from_redirect_response(transaction, '123')
+      sdk.update_transaction_from_redirect_response(transaction, sdk.parse_redirect_response(double('encrypted_response')))
     end
   end
 

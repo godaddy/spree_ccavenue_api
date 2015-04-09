@@ -19,21 +19,29 @@ module Spree
     # return from ccavenue
     def callback
       Rails.logger.debug "Received callback from CCAvenue #{params.inspect}"
-      transaction            = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
-      session[:order_id]     ||= params[:order_id]
-      session[:access_token] = order.guest_token if order.respond_to?(:guest_token)
+      @cc_params = provider.parse_redirect_response(params['encResp'])
+      transaction = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
+      provider.update_transaction_from_redirect_response(transaction, @cc_params)
+      if transaction.success?
+        payment = order.payments.create!({
+                                           :source         => transaction,
+                                           :amount         => transaction.ccavenue_amount,
+                                           :payment_method => payment_method,
+                                           # we set the response code here itself, since when there is no more
+                                           # stock, order.next doesn't invoke payment.purchase! and as a result
+                                           # the response_code never gets set
+                                           :response_code  => transaction.tracking_id
+                                         })
 
-      provider.update_transaction_from_redirect_response(transaction, params['encResp'])
+        # Make sure it's the right order and total matches (no partial payment for now)
+        if order.number != transaction.ccavenue_order_number || order.total != payment.amount
+          void!(payment)
+          flash[:error] = Spree.t('ccavenue.checkout_payment_error')
+          redirect_to checkout_state_path(order.state)
+          return
+        end
+      end
 
-      payment = order.payments.create!({
-                                         :source         => transaction,
-                                         :amount         => order.total,
-                                         :payment_method => payment_method,
-                                         # we set the response code here itself, since when there is no more
-                                         # stock, order.next doesn't invoke payment.purchase! and as a result
-                                         # the response_code never gets set
-                                         :response_code  => transaction.tracking_id
-                                       })
       order.next
       if order.complete?
         flash.notice            = Spree.t('ccavenue.order_processed_successfully')
@@ -63,7 +71,7 @@ module Spree
 
     # so we can catch exceptions while voiding
     def void!(payment)
-      Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock"
+      Rails.logger.warn "Voiding payment for order: #{order.id} tracking_id: #{payment.source.tracking_id} since out of stock or incorrect order"
       if void_payment(payment)
         flash[:error] = Spree.t('ccavenue.checkout_low_inventory_after_payment_warning')
       else
@@ -75,7 +83,8 @@ module Spree
     end
 
     def ccavenue_transaction
-      Spree::Ccavenue::Transaction.find(params[:transaction_id])
+      order_number, transaction_id = @cc_params['order_id'].split('-')
+      Spree::Ccavenue::Transaction.find(transaction_id)    
     end
 
     def log_error(e)
@@ -104,10 +113,7 @@ module Spree
     end
 
     def redirect_url(transaction)
-      ccavenue_callback_url(payment_method,
-                            :order_id       => order.id,
-                            :transaction_id => transaction.id,
-                            :protocol       => request.local? ? request.protocol : 'https')
+      ccavenue_callback_url(payment_method, protocol: request.local? ? request.protocol : 'https')
     end
 
     def ccavenue_redirect_params(order, transaction)
