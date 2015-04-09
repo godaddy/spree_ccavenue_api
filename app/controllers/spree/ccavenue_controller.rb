@@ -22,22 +22,24 @@ module Spree
       @cc_params = provider.parse_redirect_response(params['encResp'])
       transaction = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
       provider.update_transaction_from_redirect_response(transaction, @cc_params)
-      payment = order.payments.create!({
-                                         :source         => transaction,
-                                         :amount         => transaction.ccavenue_amount,
-                                         :payment_method => payment_method,
-                                         # we set the response code here itself, since when there is no more
-                                         # stock, order.next doesn't invoke payment.purchase! and as a result
-                                         # the response_code never gets set
-                                         :response_code  => transaction.tracking_id
-                                       })
+      if transaction.success?
+        payment = order.payments.create!({
+                                           :source         => transaction,
+                                           :amount         => transaction.ccavenue_amount,
+                                           :payment_method => payment_method,
+                                           # we set the response code here itself, since when there is no more
+                                           # stock, order.next doesn't invoke payment.purchase! and as a result
+                                           # the response_code never gets set
+                                           :response_code  => transaction.tracking_id
+                                         })
 
-      # Make sure it's the right order and total matches (no partial payment for now)
-      if order.number != transaction.ccavenue_order_number || order.total != payment.amount
-        void!(payment)
-        flash[:error] = Spree.t('ccavenue.checkout_payment_error')
-        redirect_to checkout_state_path(order.state)
-        return
+        # Make sure it's the right order and total matches (no partial payment for now)
+        if order.number != transaction.ccavenue_order_number || order.total != payment.amount
+          void!(payment)
+          flash[:error] = Spree.t('ccavenue.checkout_payment_error')
+          redirect_to checkout_state_path(order.state)
+          return
+        end
       end
 
       order.next
