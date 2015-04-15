@@ -48,7 +48,7 @@ module Spree
         session[:order_id]      = nil
         redirect_to completion_route(order)
       else
-        flash[:error] = order.errors ? order.errors.full_messages.first : Spree.t('ccavenue.generic_failed')
+        flash[:error] = order.errors.full_messages.first || Spree.t('ccavenue.generic_failed')
         redirect_to checkout_state_path(order.state)
       end
     rescue => e

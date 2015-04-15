@@ -1,7 +1,9 @@
+require 'ccavenue_api/response'
+
 describe CcavenueApi::Response do
 
   let(:successful_http_payload) { {"status" => "0", "enc_response" => "1234"} }
-  let(:failed_http_payload) { {"status" => "1", "enc_response" => "1234"} }
+  let(:failed_api_payload) { {"status" => "1", "enc_response" => "1234"} }
   let(:crypter) { CcavenueApi::Crypter.new('123') }
   let(:success_cancel_response) { {"Order_Result" => {"success_count" => 0}} }
   let(:fail_cancel_response) { {"Order_Result" => {"success_count" => "1", "failed_List" => {"failed_order" => {"reason" => 'failed cancel'}}}} }
@@ -11,7 +13,6 @@ describe CcavenueApi::Response do
   let(:success_order_response) {  {"Order_Status_Result" => { "status" => 0, "order_status" => "0", "order_status_date_time" => '123' }} }
   let(:fail_order_response) { {"Order_Status_Result" => { "status" => 1, "order_status" => "1", "order_status_date_time" => '123', "error_desc" => "order status failed" }} }
 
-
   describe "#failed_http_request" do
     it "returns a CcavenueApi::Response object" do
       expect(CcavenueApi::Response.failed_http_request(double, double)).to be_kind_of(CcavenueApi::Response)
@@ -20,6 +21,7 @@ describe CcavenueApi::Response do
       expect(CcavenueApi::Response.failed_http_request(double, double).success?).to eq(false)
     end
   end
+
   describe "#successful_http_request" do
     before do
       allow_any_instance_of(CcavenueApi::Crypter).to receive(:decrypt).and_return(double('decrypted_response'))
@@ -29,8 +31,13 @@ describe CcavenueApi::Response do
     it "returns a CcavenueApi::Response object" do
       expect(CcavenueApi::Response.successful_http_request(successful_http_payload, crypter)).to be_kind_of(CcavenueApi::Response)
     end
-    it "the returned object indicates success" do
+    it "returns an object indicating success" do
       expect(CcavenueApi::Response.successful_http_request(successful_http_payload, crypter).success?).to eq(true)
+    end
+    context "with api failure" do
+      it "returns an object indicating failure" do
+        expect(CcavenueApi::Response.successful_http_request(failed_api_payload, crypter).success?).to eq false
+      end
     end
   end
 
@@ -57,7 +64,6 @@ describe CcavenueApi::Response do
       expect(CcavenueApi::Response.build_from_response(fail_order_response)).to eq({:request_status=>:failed, :reason=>"order status failed", :order_status=>:failed, :order_status_date_time=>"123"})
     end
   end
-
 
   describe "#success?" do
     it "returns true when http_status and api_status both are success" do
@@ -165,4 +171,5 @@ describe CcavenueApi::Response do
 
 
   end
+
 end

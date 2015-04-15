@@ -1,5 +1,3 @@
-require 'ccavenue-sdk'
-
 Spree::Admin::PaymentMethodsController.class_eval do
   def ccavenue_verify
     payment_method = Spree::PaymentMethod.find(params[:id])
