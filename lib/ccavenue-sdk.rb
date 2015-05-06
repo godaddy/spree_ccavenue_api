@@ -367,8 +367,7 @@ module CcavenueApi
                               'Providing Reference number/Order Number is mandatory']
 
     def credentials_valid?
-      valid_reason = VALIDATION_SUCCESS_MSGS.include?(@reason)
-      self.http_status == :success && self.api_status == :success && valid_reason
+      self.http_status == :success && self.api_status == :success && VALIDATION_SUCCESS_MSGS.include?(@reason)
     end
 
     def credentials_validation_error
