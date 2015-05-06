@@ -54,7 +54,7 @@ module CcavenueApi
                 :merchant_id, :access_code, :encryption_key, :test_mode
 
     def initialize(opts)
-      @test_mode = opts[:test_mode].nil? ? false : opts[:test_mode]    # it hits production urls by default now and test is the forced mode
+      @test_mode = opts[:test_mode].nil? ? false : opts[:test_mode] # it hits production urls by default now and test is the forced mode
 
       @transaction_url = opts[:transaction_url].present? ? opts[:transaction_url] : (@test_mode ? self.class.default_transaction_url : self.class.production_transaction_url)
       @api_url         = opts[:api_url].present? ? opts[:api_url] : (@test_mode ? self.class.default_api_url : self.class.production_api_url)
@@ -74,8 +74,8 @@ module CcavenueApi
     # Browser Redirect methods
     #
     def build_ccavenue_checkout_transaction(order)
-      ccavenue_transaction_class.create!(:amount   => order.total.to_s,
-                                         :currency => order.currency.to_s,
+      ccavenue_transaction_class.create!(:amount                => order.total.to_s,
+                                         :currency              => order.currency.to_s,
                                          :ccavenue_order_number => order.number
       )
     end
@@ -103,10 +103,10 @@ module CcavenueApi
     def update_transaction_from_redirect_response(transaction, cc_params)
       Rails.logger.info "Decrypted params from ccavenue #{cc_params.inspect}"
       transaction.update_attributes!(
-        :auth_desc             => cc_params['order_status'],
-        :card_category         => cc_params['card_name'],
-        :tracking_id           => cc_params['tracking_id'],
-        :ccavenue_amount       => cc_params['amount']
+        :auth_desc       => cc_params['order_status'],
+        :card_category   => cc_params['card_name'],
+        :tracking_id     => cc_params['tracking_id'],
+        :ccavenue_amount => cc_params['amount']
       )
     end
 
@@ -137,8 +137,8 @@ module CcavenueApi
     # succeed, we try refunding the payment
     def void!(tracking_id)
       transaction = ccavenue_transaction_class.find_by_tracking_id(tracking_id) || raise(ActiveRecord::RecordNotFound)
-      response = self.cancel!(transaction)
-      response = self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
+      response    = self.cancel!(transaction)
+      response    = self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
       Rails.logger.info %Q!Void api request returned #{response.void_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end
@@ -274,7 +274,7 @@ module CcavenueApi
 
       # the keys of this hash are the attributes of the response
       def build_from_response(response)
-        hsh = if response['Refund_Order_Result']  # refund response
+        hsh = if response['Refund_Order_Result'] # refund response
                 tmp = {refund_status: (check_if_equal(response['Refund_Order_Result']['refund_status'], 0)) ? :success : :failed, }
                 if response['Refund_Order_Result']['reason'] # Only present for failed requests
                   tmp[:reason] = response['Refund_Order_Result']['reason']
@@ -289,7 +289,7 @@ module CcavenueApi
                 }
                 tmp[:reason] = response['Order_Status_Result']['error_desc'] if response['Order_Status_Result']['error_desc']
                 tmp
-              elsif response['Order_Result']  # cancel response
+              elsif response['Order_Result'] # cancel response
                 success_count = Integer(response['Order_Result']['success_count']) rescue nil
                 tmp = {success_count: success_count}
                 if response['Order_Result']['failed_List'] && (response['Order_Result']['failed_List']['failed_order']).kind_of?(Hash)
@@ -363,11 +363,12 @@ module CcavenueApi
     end
 
     ### merchant credentials validation
-    VALIDATION_SUCCESS_MSG = 'Providing Reference_No/Order No is mandatory'
+    VALIDATION_SUCCESS_MSGS = ['Providing Reference_No/Order No is mandatory',
+                              'Providing Reference number/Order Number is mandatory']
 
     def credentials_valid?
-      valid_reason = @reason.match(/#{VALIDATION_SUCCESS_MSG}/) unless @reason.blank?
-      self.http_status == :success && self.api_status == :success && valid_reason.present?
+      valid_reason = VALIDATION_SUCCESS_MSGS.include?(@reason)
+      self.http_status == :success && self.api_status == :success && valid_reason
     end
 
     def credentials_validation_error
