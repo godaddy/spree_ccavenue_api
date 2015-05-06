@@ -148,13 +148,13 @@ describe CcavenueApi::Response do
 
   describe "#credentials_valid?" do
     it "returns true when http_status and api_status both are success and call has succeeded (in its perverted sense)" do
-      expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :success, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSG).credentials_valid?).to eq(true)
+      expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :success, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSGS.last).credentials_valid?).to eq(true)
     end
     it "returns false when http_status is false" do
-      expect(CcavenueApi::Response.new(:http_status => :failed, :api_status => :success, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSG).credentials_valid?).to eq(false)
+      expect(CcavenueApi::Response.new(:http_status => :failed, :api_status => :success, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSGS.last).credentials_valid?).to eq(false)
     end
     it "returns false when api_status is false" do
-      expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :failed, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSG).credentials_valid?).to eq(false)
+      expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :failed, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSGS.last).credentials_valid?).to eq(false)
     end
     it "returns false when reason is missing" do
       expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :success).credentials_valid?).to eq(false)
