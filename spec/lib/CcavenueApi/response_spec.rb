@@ -10,7 +10,10 @@ describe CcavenueApi::Response do
   let(:fail_refund_response) { {"Refund_Order_Result" => {"refund_status" => "1", "reason" => 'failed refund'}} }
   let(:success_order_response) {  {"Order_Status_Result" => { "status" => 0, "order_status" => "0", "order_status_date_time" => '123' }} }
   let(:fail_order_response) { {"Order_Status_Result" => { "status" => 1, "order_status" => "1", "order_status_date_time" => '123', "error_desc" => "order status failed" }} }
-
+  let(:order_status_missing_messages) { ['Providing Reference_No/Order No is mandatory',
+                                         'Providing Reference number/Order Number is mandatory',
+                                         'Providing Reference number/Order Number is mandatory.']
+                                      }
 
   describe "#failed_http_request" do
     it "returns a CcavenueApi::Response object" do
@@ -148,13 +151,19 @@ describe CcavenueApi::Response do
 
   describe "#credentials_valid?" do
     it "returns true when http_status and api_status both are success and call has succeeded (in its perverted sense)" do
-      expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :success, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSGS.last).credentials_valid?).to eq(true)
+      order_status_missing_messages.each do |message|
+        expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :success, :reason => message).credentials_valid?).to eq(true)
+      end
     end
     it "returns false when http_status is false" do
-      expect(CcavenueApi::Response.new(:http_status => :failed, :api_status => :success, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSGS.last).credentials_valid?).to eq(false)
+      order_status_missing_messages.each do |message|
+        expect(CcavenueApi::Response.new(:http_status => :failed, :api_status => :success, :reason => message).credentials_valid?).to eq(false)
+      end
     end
     it "returns false when api_status is false" do
-      expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :failed, :reason => CcavenueApi::Response::VALIDATION_SUCCESS_MSGS.last).credentials_valid?).to eq(false)
+      order_status_missing_messages.each do |message|
+        expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :failed, :reason => message).credentials_valid?).to eq(false)
+      end
     end
     it "returns false when reason is missing" do
       expect(CcavenueApi::Response.new(:http_status => :success, :api_status => :success).credentials_valid?).to eq(false)

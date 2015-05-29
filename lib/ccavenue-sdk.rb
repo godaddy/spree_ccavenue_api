@@ -362,12 +362,14 @@ module CcavenueApi
       @order_status_date_time
     end
 
-    ### merchant credentials validation
-    VALIDATION_SUCCESS_MSGS = ['Providing Reference_No/Order No is mandatory',
-                              'Providing Reference number/Order Number is mandatory']
-
+    # The regex herein matches the following known responses:
+    #
+    # Providing Reference_No/Order No is mandatory
+    # Providing Reference number/Order Number is mandatory
+    # Providing Reference number/Order Number is mandatory.
+    #
     def credentials_valid?
-      self.http_status == :success && self.api_status == :success && VALIDATION_SUCCESS_MSGS.include?(@reason)
+      self.http_status == :success && self.api_status == :success && !!(@reason =~ /\AProviding Reference.*is mandatory(\.)?\z/)
     end
 
     def credentials_validation_error
