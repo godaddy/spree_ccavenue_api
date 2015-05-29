@@ -369,7 +369,7 @@ module CcavenueApi
     # Providing Reference number/Order Number is mandatory.
     #
     def credentials_valid?
-      self.http_status == :success && self.api_status == :success && !!(@reason =~ /^Providing Reference.*is mandatory(\.)?$/)
+      self.http_status == :success && self.api_status == :success && !!(@reason =~ /\AProviding Reference.*is mandatory(\.)?\z/)
     end
 
     def credentials_validation_error
