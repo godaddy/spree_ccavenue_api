@@ -110,6 +110,9 @@ module CcavenueApi
       )
     end
 
+    #############
+    # API stuff
+
     # CCAvenue doesn't have a validate merchant api endpoint.
     # we use the order status api endpoint with an empty order number to simulate it
     def validate_merchant_credentials(new_access_code, new_encryption_key)
@@ -119,8 +122,8 @@ module CcavenueApi
 
       # init SDK with new merchant credentials
       init_from_merchant_credentials(new_access_code, new_encryption_key)
-      data     = {reference_no: '', order_no: ''}.to_json # empty order id
-      response = api_request(req_builder.order_status(data))
+      data     = { reference_no: '', order_no: '' }.to_json # empty order id
+      response = api_request(req_builder.order_status(data), MerchantValidationResponse)
       Rails.logger.info "Received following API validation response: #{response.inspect}"
       response.credentials_valid?
     ensure
@@ -137,27 +140,28 @@ module CcavenueApi
     # succeed, we try refunding the payment
     def void!(tracking_id)
       transaction = ccavenue_transaction_class.find_by_tracking_id(tracking_id) || raise(ActiveRecord::RecordNotFound)
-      response    = self.cancel!(transaction)
-      response    = self.refund!(transaction) unless response.cancel_successful? # cancel command succeeded
-      Rails.logger.info %Q!Void api request returned #{response.void_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
+      cancel_response = self.cancel!(transaction)
+      refund_response = self.refund!(transaction) unless cancel_response.successful? # cancel command succeeded
+      response    = cancel_response || refund_response
+      Rails.logger.info %Q!Void api request returned #{response.successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end
 
     def cancel!(transaction)
-      response = build_and_invoke_api_request(transaction) do
-        data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.amount.to_s}]}.to_json
+      response = build_and_invoke_api_request(transaction, CancelResponse) do
+        data = { 'order_List' => [{ reference_no: transaction.tracking_id, amount: transaction.amount.to_s }] }.to_json
         req_builder.cancel_order(data)
       end
-      Rails.logger.info %Q!Cancel api request returned #{response.cancel_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
+      Rails.logger.info %Q!Cancel api request returned #{response.successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end
 
     def refund!(transaction)
-      response = build_and_invoke_api_request(transaction) do
-        data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.amount.to_s}]}.to_json
+      response = build_and_invoke_api_request(transaction, RefundResponse) do
+        data = { 'order_List' => [{ reference_no: transaction.tracking_id, amount: transaction.amount.to_s }] }.to_json
         req_builder.refund_order(data)
       end
-      Rails.logger.info %Q!Refund api request returned #{response.refund_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
+      Rails.logger.info %Q!Refund api request returned #{response.successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end
 
@@ -185,18 +189,18 @@ module CcavenueApi
       @req_builder    = RequestBuilder.new(@access_code, @crypter) if @access_code && @encryption_key
     end
 
-    def api_request(payload)
+    def api_request(payload, response_klass)
       http_response = ::RestClient::Request.execute(method:     :post, url: api_url, payload: payload,
                                                     headers:    {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
                                                     verify_ssl: !test_mode)
-      Response.successful_http_request(Rack::Utils.parse_query(http_response), crypter)
+      response_klass.successful_http_request(Rack::Utils.parse_query(http_response), crypter)
     rescue ::RestClient::RequestTimeout, ::RestClient::Exception, RuntimeError => error
-      return Response.failed_http_request(error.message, crypter)
+      return response_klass.failed_http_request(error.message, crypter)
     end
 
-    def build_and_invoke_api_request(transaction)
+    def build_and_invoke_api_request(transaction, response_klass)
       raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
-      response = api_request(yield)
+      response = api_request(yield, response_klass)
       Rails.logger.debug "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
       response
     end
@@ -210,11 +214,14 @@ module CcavenueApi
 
     attr_reader :crypter
 
+    API_VERSION = 1.1
+
     def initialize(access_code, crypter)
       @crypter     = crypter
       @defaultHash = {
         request_type: 'JSON',
         access_code:  access_code,
+        version: API_VERSION
       }
     end
 
@@ -270,45 +277,6 @@ module CcavenueApi
                      :original_payload => decrypted_hash
                    }.merge(parsed))
         end
-      end
-
-      # the keys of this hash are the attributes of the response
-      def build_from_response(response)
-        hsh = if response['Refund_Order_Result'] # refund response
-                tmp = {refund_status: (check_if_equal(response['Refund_Order_Result']['refund_status'], 0)) ? :success : :failed, }
-                if response['Refund_Order_Result']['reason'] # Only present for failed requests
-                  tmp[:reason] = response['Refund_Order_Result']['reason']
-                end
-                tmp
-                # "{\"Order_Status_Result\":{\"status\":1,\"error_desc\":\"Providing Reference_No/Order No is mandatory.\"}}"
-              elsif response['Order_Status_Result'] # order status response
-                tmp          = {
-                  request_status:         (check_if_equal(response['Order_Status_Result']['status'], 0)) ? :success : :failed,
-                  order_status:           (check_if_equal(response['Order_Status_Result']['order_status'], 0)) ? :success : :failed,
-                  order_status_date_time: response['Order_Status_Result']['order_status_date_time']
-                }
-                tmp[:reason] = response['Order_Status_Result']['error_desc'] if response['Order_Status_Result']['error_desc']
-                tmp
-              elsif response['Order_Result'] # cancel response
-                success_count = Integer(response['Order_Result']['success_count']) rescue nil
-                tmp = {success_count: success_count}
-                if response['Order_Result']['failed_List'] && (response['Order_Result']['failed_List']['failed_order']).kind_of?(Hash)
-                  tmp[:reason] = response['Order_Result']['failed_List']['failed_order']['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
-                elsif response['Order_Result']['failed_List'] && (response['Order_Result']['failed_List']['failed_order']).kind_of?(Array)
-                  tmp[:reason] = ((response['Order_Result']['failed_List']['failed_order']).first)['reason'] rescue Spree.t('ccavenue.api_response_parse_failed')
-                end
-                tmp
-              else
-                raise ArgumentError.new 'Unknown response type'
-              end
-
-        return hsh
-      rescue => e
-        Rails.logger.error("Error parsing ccavenue api response: #{e.message}")
-        return {
-          reason:     Spree.t("ccavenue.api_response_parse_failed"),
-          api_status: :failed
-        }
       end
 
       def check_if_equal(var, val)

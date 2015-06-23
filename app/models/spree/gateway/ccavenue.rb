@@ -63,7 +63,7 @@ module Spree
     def void(tracking_id, options={})
       Rails.logger.debug "tracking id #{tracking_id}"
       response = provider.void!(tracking_id)
-      ret = if response.void_successful?
+      ret = if response.successful?
         ActiveMerchant::Billing::Response.new(true, Spree.t('ccavenue.void_successful'), {},
                                               :test => self.preferred_test_mode, :authorization => tracking_id)
       else
