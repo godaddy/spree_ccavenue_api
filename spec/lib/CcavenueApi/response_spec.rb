@@ -3,17 +3,13 @@ describe CcavenueApi::Response do
   let(:successful_http_payload) { {"status" => "0", "enc_response" => "1234"} }
   let(:failed_http_payload) { {"status" => "1", "enc_response" => "1234"} }
   let(:crypter) { CcavenueApi::Crypter.new('123') }
-  let(:success_cancel_response) { {"Order_Result" => {"success_count" => 0}} }
-  let(:fail_cancel_response) { {"Order_Result" => {"success_count" => "1", "failed_List" => {"failed_order" => {"reason" => 'failed cancel'}}}} }
-  let(:fail_cancel_response2) { {"Order_Result" => {"success_count" => "1", "failed_List" => {"failed_order" => [{"reason" => 'failed cancel'}]}}} }
+  let(:success_cancel_response) { {"Order_Result" => {"success_count" => 1}} }
+  let(:fail_cancel_response) { {"Order_Result" => {"success_count" => "0", "failed_List" => {"failed_order" => {"error_code" => "51304", "reason" => 'failed cancel'}}}} }
   let(:success_refund_response) { {"Refund_Order_Result" => {"refund_status" => 0}} }
-  let(:fail_refund_response) { {"Refund_Order_Result" => {"refund_status" => "1", "reason" => 'failed refund'}} }
-  let(:success_order_response) {  {"Order_Status_Result" => { "status" => 0, "order_status" => "0", "order_status_date_time" => '123' }} }
-  let(:fail_order_response) { {"Order_Status_Result" => { "status" => 1, "order_status" => "1", "order_status_date_time" => '123', "error_desc" => "order status failed" }} }
-  let(:order_status_missing_messages) { ['Providing Reference_No/Order No is mandatory',
-                                         'Providing Reference number/Order Number is mandatory',
-                                         'Providing Reference number/Order Number is mandatory.']
-                                      }
+  let(:fail_refund_response) { {"Refund_Order_Result" => {"refund_status" => 1, "reason" => 'failed refund', "error_code" => "51310"}} }
+  let(:success_order_response) {  {"Order_Status_Result" => { "status" => 0 }} }
+  let(:fail_order_response) { {"Order_Status_Result" => { "status" => 1, "error_desc" => "Ensure that the Reference Number parameter is not blank.",
+                                                          "error_code" => "51001" }} }
 
   describe "#failed_http_request" do
     it "returns a CcavenueApi::Response object" do

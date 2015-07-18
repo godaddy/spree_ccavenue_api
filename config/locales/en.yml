@@ -14,6 +14,7 @@ en:
       void_successful: "Payment was voided successfully."
       verification_failed: "Verification failed."
       verification_successful: "Verification successful."
+      verification_unsuccessful: "The merchant account information you entered is invalid. Please check and try again."
       unknown_api_error: "Unknown ccavenue api error encountered."
       checkout_payment_error: "We're unable to process your payment at this time. Please try again later."
       transaction: "Transaction"
