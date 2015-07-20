@@ -15,7 +15,8 @@ describe CcavenueApi::SDK do
   let(:test_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => true)) }
   let(:prod_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => false)) }
   let(:order) { FactoryGirl.create(:order_with_totals) }
-  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123) }
+  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123,
+                                :ccavenue_order_number      => 'R123-8') }
   let(:crypter) { double('crypter') }
 
   describe "URLS" do
@@ -168,7 +169,7 @@ describe CcavenueApi::SDK do
     end
     it "invokes req_builder refund order" do
       allow(sdk).to receive(:api_request).and_return(refund_res)
-      expect(sdk).to receive(:req_builder).and_return(req_builder=double('req builder', refund_order: '123'))
+      expect(sdk).to receive(:req_builder).and_return(req_builder=double('req builder', refund_order: '123', refund_amount: 123))
       expect(sdk.refund!(cc_transaction)).to eq(refund_res)
     end
   end
