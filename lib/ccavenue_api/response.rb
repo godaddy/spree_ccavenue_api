@@ -42,5 +42,9 @@ module CcavenueApi
       end
     end
 
+    def successful?
+      self.http_status == :success && self.api_status == :success && !!@request_successful
+    end
+
   end
 end

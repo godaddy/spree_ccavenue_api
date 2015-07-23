@@ -140,9 +140,8 @@ module CcavenueApi
     # succeed, we try refunding the payment
     def void!(tracking_id)
       transaction = ccavenue_transaction_class.find_by_tracking_id(tracking_id) || raise(ActiveRecord::RecordNotFound)
-      cancel_response = self.cancel!(transaction)
-      refund_response = self.refund!(transaction) unless cancel_response.successful? # cancel command succeeded
-      response    =  refund_response || cancel_response
+      response = self.cancel!(transaction)
+      response = self.refund!(transaction) unless response.successful? # cancel command succeeded
       Rails.logger.info %Q!Void api request returned #{response.successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
       response
     end

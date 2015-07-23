@@ -20,6 +20,8 @@ en:
       transaction: "Transaction"
       state: "State"
       ccavenue_order_number: "Order number at CCAvenue"
+      invalid_api_error_code: "Invalid error code encountered: %{error_code}"
+      unexpected_api_status: "Unexpected status value: %{status}"
       card_category: "Card Category"
       auth_desc: "Auth Desc (Authorization)"
       checkout_low_inventory_after_payment_warning: "Your payment is not processed because an item in your cart has become unavailable."

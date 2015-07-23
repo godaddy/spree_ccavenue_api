@@ -7,11 +7,11 @@ module CcavenueApi
         status = Integer(decrypted_response['refund_status'])
         if status == 0
           # successful
-          { refund_status: status }
+          { request_successful: true }
         else
           # some error, log it
           Rails.logger.error "ccavenue refund response: #{decrypted_response.inspect}"
-          { refund_status: status, error_code: decrypted_response['error_code'], reason: decrypted_response['reason'] }
+          { request_successful: false, error_code: decrypted_response['error_code'], reason: decrypted_response['reason'] }
         end
       rescue => e
         Rails.logger.error("Error parsing ccavenue api response: #{e.message}")
@@ -20,17 +20,6 @@ module CcavenueApi
           api_status: :failed
         }
       end
-
-      ######################################
-      # instance methods
-      def successful?
-        self.http_status == :success && self.api_status == :success && @refund_status == 0
-      end
-
-      def reason
-        @reason || @error_desc
-      end
-
     end
   end
 end
