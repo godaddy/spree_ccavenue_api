@@ -1,0 +1,25 @@
+---
+qa:
+  spree:
+    ccavenue:
+      generic_failed: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:generic_failed]"
+      refund_api_call_failed: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:refund_api_call_failed]"
+      unable_to_void: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:unable_to_void]"
+      void_failed: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:void_failed]"
+      api_response_parse_failed: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:api_response_parse_failed]"
+      payment_failed: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:payment_failed]"
+      payment_aborted: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:payment_aborted]"
+      instructional_text: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:instructional_text]"
+      no_transactions: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:no_transactions]"
+      order_processed_successfully: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:order_processed_successfully]"
+      void_successful: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:void_successful]"
+      verification_failed: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:verification_failed]"
+      verification_successful: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:verification_successful]"
+      unknown_api_error: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:unknown_api_error]"
+      checkout_payment_error: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:checkout_payment_error]"
+      transaction: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:transaction]"
+      state: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:state]"
+      ccavenue_order_number: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:ccavenue_order_number]"
+      card_category: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:card_category]"
+      auth_desc: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:auth_desc]"
+      checkout_low_inventory_after_payment_warning: "[spree_ccavenue/2-2-nemo-stable/config/locales/en.yml:qa:spree:ccavenue:checkout_low_inventory_after_payment_warning]"
