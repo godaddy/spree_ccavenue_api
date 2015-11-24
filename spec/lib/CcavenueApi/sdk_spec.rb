@@ -15,7 +15,8 @@ describe CcavenueApi::SDK do
   let(:test_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => true)) }
   let(:prod_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => false)) }
   let(:order) { FactoryGirl.create(:order_with_totals) }
-  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123) }
+  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123,
+                                :ccavenue_order_number      => 'R123-8') }
   let(:crypter) { double('crypter') }
 
   describe "URLS" do
@@ -103,51 +104,66 @@ describe CcavenueApi::SDK do
     let(:new_access_code) { double('new access code') }
     let(:new_encryption_key) { double('new encryption key') }
     let(:req_builder) { double('req builder') }
+
     before do
-      expect(sdk).to receive(:api_request).and_return(double('api_response', :credentials_valid? => true))
+      expect(sdk).to receive(:api_request).and_return(api_response)
       expect(sdk).to receive(:req_builder).and_return(req_builder)
       allow(req_builder).to receive(:order_status).and_return('123')
     end
-    it "stashes and restores the old creds back" do
-      before_access_code, before_encryption_key = sdk.access_code, sdk.encryption_key
-      sdk.validate_merchant_credentials(new_access_code, new_encryption_key)
-      expect(sdk.access_code).to eq(before_access_code)
-      expect(sdk.encryption_key).to eq(before_encryption_key)
-    end
 
-    it "invokes init_from_merchant_credentials to initialize the sdk with new values" do
-      expect(sdk).to receive(:init_from_merchant_credentials).with(new_access_code, new_encryption_key)
-      sdk.validate_merchant_credentials(new_access_code, new_encryption_key)
-    end
+    context "with valid credentials" do
+      let(:api_response) { double('api_response', :successful? => true) }
+      it "stashes and restores the old creds back" do
+        before_access_code, before_encryption_key = sdk.access_code, sdk.encryption_key
+        sdk.validate_merchant_credentials(new_access_code, new_encryption_key)
+        expect(sdk.access_code).to eq(before_access_code)
+        expect(sdk.encryption_key).to eq(before_encryption_key)
+      end
 
-    it "invokes req_builder to build the order_status data" do
-      expect(req_builder).to receive(:order_status)
-      sdk.validate_merchant_credentials(new_access_code, new_encryption_key)
+      it "invokes init_from_merchant_credentials to initialize the sdk with new values" do
+        expect(sdk).to receive(:init_from_merchant_credentials).with(new_access_code, new_encryption_key)
+        sdk.validate_merchant_credentials(new_access_code, new_encryption_key)
+      end
+      it "invokes api_request and returns the response from it" do
+        expect(sdk.validate_merchant_credentials(new_access_code, new_encryption_key)).to eq(api_response.successful?)
+      end
+      it "invokes req_builder to build the order_status data" do
+        expect(req_builder).to receive(:order_status)
+        sdk.validate_merchant_credentials(new_access_code, new_encryption_key)
+      end
+      it "returns true when creds are valid" do
+        expect(sdk.validate_merchant_credentials(new_access_code, new_encryption_key)).to eq(true)
+      end
+    end
+    context "with invalid credentials" do
+      let(:api_response) { double('api_response', :successful? => false) }
+      it "returns false when creds are invalid" do
+        expect(sdk.validate_merchant_credentials(new_access_code, new_encryption_key)).to eq(false)
+      end
     end
   end
 
   describe "#void!" do
-    let(:success_cancel_res) { CcavenueApi::Response.new(http_status: :success, api_status: :success, success_count: 1) }
-    let(:success_refund_res) { CcavenueApi::Response.new(http_status: :success, api_status: :success, refund_status: :success) }
-    let(:fail_cancel_res) { CcavenueApi::Response.new(http_status: :success, api_status: :success, success_count: 0) }
+    let(:success_cancel_res) { CcavenueApi::Responses::CancelResponse.new(http_status: :success, api_status: :success, request_successful: true) }
+    let(:success_refund_res) { CcavenueApi::Responses::RefundResponse.new(http_status: :success, api_status: :success, request_successful: true) }
+    # {"failed_List"=>[{"reference_no"=>"304000318842", "reason"=>"Order List: Invalid Parameter", "error_code"=>"51302"}], "error_desc"=>"", "success_count"=>0, "error_code"=>""}
+    let(:fail_cancel_res) { CcavenueApi::Responses::CancelResponse.new(http_status: :success, api_status: :success, request_successful: false) }
     before do
       allow(Spree::Ccavenue::Transaction).to receive(:find_by_tracking_id).and_return(cc_transaction)
     end
     it "calls cancel! and is successful when cancel! is successful" do
       expect(sdk).to receive(:cancel!).and_return(success_cancel_res).at_least(:once)
-      expect(sdk.void!(double).cancel_successful?).to eq(true)
-      expect(sdk.void!(double).void_successful?).to eq(true)
+      expect(sdk.void!(double).successful?).to eq(true)
     end
     it "calls refund! when cancel fails and is successful when refund! is successful" do
       expect(sdk).to receive(:cancel!).and_return(fail_cancel_res).at_least(:once)
       expect(sdk).to receive(:refund!).and_return(success_refund_res).at_least(:once)
-      expect(sdk.void!(cc_transaction).refund_successful?).to eq(true)
-      expect(sdk.void!(cc_transaction).void_successful?).to eq(true)
+      expect(sdk.void!(cc_transaction).successful?).to eq(true)
     end
   end
 
   describe "#cancel!" do
-    let(:cancel_res) { CcavenueApi::Response.new(http_status: :success, api_status: :success, success_count: 1) }
+    let(:cancel_res) { CcavenueApi::Responses::CancelResponse.new(http_status: :success, api_status: :success, request_successful: true) }
     it "invokes build_and_invoke_api_request and returns the response from it" do
       expect(sdk).to receive(:build_and_invoke_api_request).and_return(cancel_res)
       expect(sdk.cancel!(cc_transaction)).to eq(cancel_res)
@@ -160,14 +176,14 @@ describe CcavenueApi::SDK do
   end
 
   describe "#refund!" do
-    let(:refund_res) { CcavenueApi::Response.new(http_status: :success, api_status: :success, refund_status: 0) }
+    let(:refund_res) { CcavenueApi::Responses::RefundResponse.new(http_status: :success, api_status: :success, request_successful: true) }
     it "invokes build_and_invoke_api_request and returns the response from it" do
       expect(sdk).to receive(:build_and_invoke_api_request).and_return(refund_res)
       expect(sdk.refund!(cc_transaction)).to eq(refund_res)
     end
     it "invokes req_builder refund order" do
       allow(sdk).to receive(:api_request).and_return(refund_res)
-      expect(sdk).to receive(:req_builder).and_return(req_builder=double('req builder', refund_order: '123'))
+      expect(sdk).to receive(:req_builder).and_return(req_builder=double('req builder', refund_order: '123', refund_amount: 123))
       expect(sdk.refund!(cc_transaction)).to eq(refund_res)
     end
   end
@@ -245,7 +261,7 @@ describe CcavenueApi::SDK do
           verify_ssl: !forced_mode
         }
         expect(::RestClient::Request).to receive(:execute).with(args).and_return(double('http response'))
-        sdk_req.send(:api_request, payload)
+        sdk_req.send(:api_request, payload, CcavenueApi::Response)
       end
     end
     it "returns a CcavenueApi::Response" do
@@ -254,22 +270,22 @@ describe CcavenueApi::SDK do
       allow(Rack::Utils).to receive(:parse_query).and_return(http_response)
       allow(CcavenueApi::Response).to receive(:successful_http_request).and_return(cc_response = double('ccave res'))
       allow_any_instance_of(CcavenueApi::Crypter).to receive(:decrypt).and_return(double)
-      expect(sdk.send(:api_request, double('payload'))).to eq(cc_response)
+      expect(sdk.send(:api_request, double('payload'), CcavenueApi::Response)).to eq(cc_response)
     end
     it "catches RestClient::RequestTimeout and returns a failed Response" do
       allow(::RestClient::Request).to receive(:execute).and_raise(RestClient::RequestTimeout)
       allow(CcavenueApi::Response).to receive(:failed_http_request).and_return(cc_response = double('ccave fail res'))
-      expect(sdk.send(:api_request, double('payload'))).to eq(cc_response)
+      expect(sdk.send(:api_request, double('payload'), CcavenueApi::Response)).to eq(cc_response)
     end
     it "catches RestClient::Exception and returns a failed Response" do
       allow(::RestClient::Request).to receive(:execute).and_raise(RestClient::Exception)
       allow(CcavenueApi::Response).to receive(:failed_http_request).and_return(cc_response = double('ccave fail res'))
-      expect(sdk.send(:api_request, double('payload'))).to eq(cc_response)
+      expect(sdk.send(:api_request, double('payload'), CcavenueApi::Response)).to eq(cc_response)
     end
     it "catches RuntimeError and returns a failed Response" do
       allow(::RestClient::Request).to receive(:execute).and_raise(RuntimeError)
       allow(CcavenueApi::Response).to receive(:failed_http_request).and_return(cc_response = double('ccave fail res'))
-      expect(sdk.send(:api_request, double('payload'))).to eq(cc_response)
+      expect(sdk.send(:api_request, double('payload'), CcavenueApi::Response)).to eq(cc_response)
     end
   end
 
