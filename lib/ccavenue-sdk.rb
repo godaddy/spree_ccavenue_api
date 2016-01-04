@@ -145,7 +145,7 @@ module CcavenueApi
 
     def cancel!(transaction)
       response = build_and_invoke_api_request(transaction) do
-        data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.amount.to_s}]}.to_json
+        data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.ccavenue_amount.to_s}]}.to_json
         req_builder.cancel_order(data)
       end
       Rails.logger.info %Q!Cancel api request returned #{response.cancel_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!

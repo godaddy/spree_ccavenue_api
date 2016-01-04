@@ -15,7 +15,9 @@ describe CcavenueApi::SDK do
   let(:test_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => true)) }
   let(:prod_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => false)) }
   let(:order) { FactoryGirl.create(:order_with_totals) }
-  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123) }
+  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123, :ccavenue_amount => 456) }
+  let(:data_for_cancel) { { 'order_List' => [{ reference_no: cc_transaction.tracking_id, amount: cc_transaction.ccavenue_amount.to_s }] }.to_json }
+  let(:req_builder) { double('req builder') }
   let(:crypter) { double('crypter') }
 
   describe "URLS" do
@@ -102,7 +104,6 @@ describe CcavenueApi::SDK do
   describe "#validate_merchant_credentials" do
     let(:new_access_code) { double('new access code') }
     let(:new_encryption_key) { double('new encryption key') }
-    let(:req_builder) { double('req builder') }
     before do
       expect(sdk).to receive(:api_request).and_return(double('api_response', :credentials_valid? => true))
       expect(sdk).to receive(:req_builder).and_return(req_builder)
@@ -149,12 +150,14 @@ describe CcavenueApi::SDK do
   describe "#cancel!" do
     let(:cancel_res) { CcavenueApi::Response.new(http_status: :success, api_status: :success, success_count: 1) }
     it "invokes build_and_invoke_api_request and returns the response from it" do
+      allow(sdk).to receive(:req_builder).and_return(req_builder)
       expect(sdk).to receive(:build_and_invoke_api_request).and_return(cancel_res)
       expect(sdk.cancel!(cc_transaction)).to eq(cancel_res)
     end
     it "invokes req_builder cancel_order" do
+      allow(sdk).to receive(:req_builder).and_return(req_builder)
       allow(sdk).to receive(:api_request).and_return(cancel_res)
-      expect(sdk).to receive(:req_builder).and_return(req_builder=double('req builder', cancel_order: '123'))
+      expect(req_builder).to receive(:cancel_order).with(data_for_cancel)
       expect(sdk.cancel!(cc_transaction)).to eq(cancel_res)
     end
   end
