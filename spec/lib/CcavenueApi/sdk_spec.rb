@@ -15,9 +15,11 @@ describe CcavenueApi::SDK do
   let(:test_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => true)) }
   let(:prod_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => false)) }
   let(:order) { FactoryGirl.create(:order_with_totals) }
-  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123, :ccavenue_amount => 456) }
+  let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123, :ccavenue_amount => 456,
+                                ccavenue_order_number: 'R1234') }
   let(:data_for_cancel) { { 'order_List' => [{ reference_no: cc_transaction.tracking_id, amount: cc_transaction.ccavenue_amount.to_s }] }.to_json }
-  let(:data_for_refund) { { 'order_List' => [{ reference_no: cc_transaction.tracking_id, amount: cc_transaction.ccavenue_amount.to_s }] }.to_json }
+  let(:data_for_refund) { { reference_no: cc_transaction.tracking_id, refund_amount: cc_transaction.ccavenue_amount.to_s,
+    refund_ref_no: cc_transaction.ccavenue_order_number }.to_json }
   let(:req_builder) { double('req builder') }
   let(:crypter) { double('crypter') }
 

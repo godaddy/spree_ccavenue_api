@@ -154,7 +154,8 @@ module CcavenueApi
 
     def refund!(transaction)
       response = build_and_invoke_api_request(transaction) do
-        data = {'order_List' => [{reference_no: transaction.tracking_id, amount: transaction.ccavenue_amount.to_s}]}.to_json
+        data = {reference_no: transaction.tracking_id, refund_amount: transaction.ccavenue_amount.to_s,
+                refund_ref_no: transaction.ccavenue_order_number}.to_json
         req_builder.refund_order(data)
       end
       Rails.logger.info %Q!Refund api request returned #{response.refund_successful? ? 'successfully' : "with a failure '#{response.reason}'"}!
