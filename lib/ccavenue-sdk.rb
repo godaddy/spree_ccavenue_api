@@ -157,7 +157,7 @@ module CcavenueApi
 
     def refund!(transaction)
       response = build_and_invoke_api_request(transaction) do
-        data = { reference_no: transaction.tracking_id, refund_amount: transaction.amount.to_s,
+        data = { reference_no: transaction.tracking_id, refund_amount: transaction.ccavenue_amount.to_s,
                  refund_ref_no: transaction.ccavenue_order_number }.to_json
         [req_builder.refund_order(data), Responses::RefundResponse]
       end
