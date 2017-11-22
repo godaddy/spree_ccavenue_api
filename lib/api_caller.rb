@@ -83,7 +83,7 @@ module CcavenueApi
     end
 
     def self.api_url(payment_method)
-      payment_method.preferred_test_mode ? 'https://180.179.175.17/apis/servlet/DoWebTrans' : 'https://login.ccavenue.com/apis/servlet/DoWebTrans'
+      payment_method.preferred_test_mode ? 'https://180.179.175.17/apis/servlet/DoWebTrans' : 'https://api.ccavenue.com/apis/servlet/DoWebTrans'
     end
 
     def self.signup_url(payment_method)
