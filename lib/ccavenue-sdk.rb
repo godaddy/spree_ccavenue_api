@@ -29,7 +29,7 @@ module CcavenueApi
         default:    "https://test.ccavenue.com/transaction/transaction.do"
       },
       api:         {
-        production: "https://login.ccavenue.com/apis/servlet/DoWebTrans",
+        production: "https://api.ccavenue.com/apis/servlet/DoWebTrans",
         default:    "https://180.179.175.17/apis/servlet/DoWebTrans"
       },
       signup:      {
