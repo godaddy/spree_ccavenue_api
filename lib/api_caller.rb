@@ -57,7 +57,6 @@ module CcavenueApi
     def self.decrypted_response(url, params, encryption_key, verify_ssl=nil)
       response = nil
       begin
-        Rails.logger.info "Params sent to #{url}: #{params.inspect}\nverify_ssl: '#{verify_ssl}'"
         response = RestClient::Request.execute(method: :post, url: url, payload: params,
                                 headers: {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
                                 verify_ssl: verify_ssl)
@@ -76,7 +75,6 @@ module CcavenueApi
     end
 
     def self.decrypt_response(response, encryption_key)
-      Rails.logger.info "Response from API: #{response.body.inspect}"
       params_s = response.body.to_s
       params = Rack::Utils.parse_query(params_s)
       ApiResponse.new(params, encryption_key)
@@ -124,7 +122,6 @@ module CcavenueApi
       def initialize_from_decrypted_response(encryption_key, params)
         enc_response = params['enc_response'].gsub('\r\n', '').strip
         json_params = ActiveSupport::JSON.decode(AESCrypter.decrypt(enc_response, encryption_key))
-        Rails.logger.info "Decrypted json params: #{json_params}"
         if json_params['Refund_Order_Result']
           self.refund_status = json_params['Refund_Order_Result']['refund_status']
           self.reason = json_params['Refund_Order_Result']['reason'] # Only present for failed requests
