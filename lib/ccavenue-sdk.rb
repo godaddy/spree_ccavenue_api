@@ -183,9 +183,7 @@ module CcavenueApi
 
     def build_and_invoke_api_request(transaction)
       raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
-      response = api_request(yield)
-      Rails.logger.debug "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
-      response
+      api_request(yield)
     end
 
 
