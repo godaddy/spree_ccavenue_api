@@ -3,10 +3,7 @@ require 'rest-client'
 require 'aes_crypter'
 
 module CcavenueApi
-  ################################
   class Crypter
-    ################################
-
     def initialize(encryption_key)
       @encryption_key = encryption_key
     end
@@ -20,9 +17,7 @@ module CcavenueApi
     end
   end
 
-  ################################
   class SDK
-    ################################
     URLS = {
       transaction: {
         production: "https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction",
@@ -48,8 +43,6 @@ module CcavenueApi
       end
     end
 
-    #################################### instance
-
     attr_reader :transaction_url, :api_url, :signup_url,
                 :merchant_id, :access_code, :encryption_key, :test_mode
 
@@ -70,9 +63,7 @@ module CcavenueApi
       Spree::Ccavenue::Transaction
     end
 
-    ###############
     # Browser Redirect methods
-    #
     def build_ccavenue_checkout_transaction(order)
       ccavenue_transaction_class.create!(:amount                => order.total.to_s,
                                          :currency              => order.currency.to_s,
@@ -91,9 +82,7 @@ module CcavenueApi
                                           merchant_param4: nil,
                                           merchant_param5: nil
                                         })
-      req            = crypter.encrypt(request_params.to_query)
-      Rails.logger.debug "Encrypting params: #{request_params.inspect} to #{req}"
-      req
+      crypter.encrypt(request_params.to_query)
     end
 
     def parse_redirect_response(encrypted_response)
@@ -101,7 +90,6 @@ module CcavenueApi
     end
 
     def update_transaction_from_redirect_response(transaction, cc_params)
-      Rails.logger.info "Decrypted params from ccavenue #{cc_params.inspect}"
       transaction.update_attributes!(
         :auth_desc       => cc_params['order_status'],
         :card_category   => cc_params['card_name'],
@@ -121,7 +109,6 @@ module CcavenueApi
       init_from_merchant_credentials(new_access_code, new_encryption_key)
       data     = {reference_no: '', order_no: ''}.to_json # empty order id
       response = api_request(req_builder.order_status(data))
-      Rails.logger.info "Received following API validation response: #{response.inspect}"
       response.credentials_valid?
     ensure
       # restore old creds back
@@ -176,7 +163,6 @@ module CcavenueApi
       @req_builder
     end
 
-    #####################################
     private
 
     def init_from_merchant_credentials(new_access_code, new_encryption_key)
@@ -197,18 +183,13 @@ module CcavenueApi
 
     def build_and_invoke_api_request(transaction)
       raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
-      response = api_request(yield)
-      Rails.logger.debug "Received following API response: #{response.inspect} for ccave transaction #{transaction.id}"
-      response
+      api_request(yield)
     end
 
 
   end
 
-  ################################
-  ################################
   class RequestBuilder
-
     attr_reader :crypter
 
     def initialize(access_code, crypter)
@@ -241,18 +222,13 @@ module CcavenueApi
     end
   end
 
-  ################################
-  ################################
   class Response
-
     class << self
       def failed_http_request(payload, decrypter)
         self.new(:reason => payload, :http_status => :failed, :original_payload => payload)
       end
 
       def successful_http_request(api_response, decrypter)
-        Rails.logger.debug "Received api response: #{api_response}"
-
         if api_response["status"] && api_response["status"] == "1"
           self.new(:reason           => api_response["enc_response"],
                    :http_status      => :success,
@@ -261,8 +237,6 @@ module CcavenueApi
           )
         else
           decrypted_payload = decrypter.decrypt(api_response['enc_response'].gsub('\r\n', '').strip)
-          Rails.logger.debug "Decrypted response: #{decrypted_payload}"
-
           decrypted_hash = ActiveSupport::JSON.decode(decrypted_payload)
           parsed         = build_from_response(decrypted_hash)
           self.new({
@@ -317,7 +291,6 @@ module CcavenueApi
       end
     end
 
-    ################################
     attr_reader :http_status, :api_status, :original_payload
 
     def initialize(opts)

@@ -55,13 +55,11 @@ module Spree
         ActiveMerchant::Billing::Response.new(false, Spree.t('ccavenue.generic_failed'), { :message => transaction.transaction_error },
                                               :test => self.preferred_test_mode)
       end
-      Rails.logger.debug "Returning from ccavenue#purchase: #{ret.inspect}"
       ret
     end
 
     # payment profiles are supported
     def void(tracking_id, options={})
-      Rails.logger.debug "tracking id #{tracking_id}"
       response = provider.void!(tracking_id)
       ret = if response.void_successful?
         ActiveMerchant::Billing::Response.new(true, Spree.t('ccavenue.void_successful'), {},
@@ -70,7 +68,6 @@ module Spree
         ActiveMerchant::Billing::Response.new(false, Spree.t('ccavenue.void_failed'), { :message => response.reason },
                                               :test => self.preferred_test_mode)
       end
-      Rails.logger.debug "Returning from ccavenue#void: #{ret.inspect}"
       ret
     end
 

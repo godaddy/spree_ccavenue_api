@@ -18,7 +18,6 @@ module Spree
 
     # return from ccavenue
     def callback
-      Rails.logger.debug "Received callback from CCAvenue #{params.inspect}"
       @cc_params = provider.parse_redirect_response(params['encResp'])
       transaction = ccavenue_transaction || raise(ActiveRecord::RecordNotFound)
       provider.update_transaction_from_redirect_response(transaction, @cc_params)
