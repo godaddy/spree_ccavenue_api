@@ -1,5 +1,5 @@
-module Spree
-  class Ccavenue::Transaction < ActiveRecord::Base
+module Spree::Ccavenue
+  class Transaction < ActiveRecord::Base
 
     def failed?
       self.auth_desc == 'Failure'
