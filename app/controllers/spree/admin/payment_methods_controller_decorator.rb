@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'ccavenue-sdk'
 
 Spree::Admin::PaymentMethodsController.class_eval do

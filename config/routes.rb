@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Spree::Core::Engine.routes.draw do
   get '/ccavenue/:id/show' => 'ccavenue#show', :as => :ccavenue_order_confirmation
   post '/ccavenue/:id/callback' => 'ccavenue#callback', :as => :ccavenue_callback

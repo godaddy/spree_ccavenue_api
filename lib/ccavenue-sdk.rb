@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'rack/utils'
 require 'rest-client'
 require 'aes_crypter'

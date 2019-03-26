@@ -1,7 +1,9 @@
+# frozen_string_literal: true
+
 module Spree
   class CcavenueController < StoreController
 
-    skip_before_filter :verify_authenticity_token, only: :callback
+    skip_before_action :verify_authenticity_token, only: :callback
     # we need this to avoid undefined method truncated_product_description in frontend. Details on: https://coveralls.io/builds/769164
     helper 'spree/orders'
     ssl_required
@@ -83,7 +85,7 @@ module Spree
 
     def ccavenue_transaction
       order_number, transaction_id = @cc_params['order_id'].split('-')
-      Spree::Ccavenue::Transaction.find(transaction_id)    
+      Spree::Ccavenue::Transaction.find(transaction_id)
     end
 
     def log_error(e)

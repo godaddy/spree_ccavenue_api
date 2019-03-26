@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #################################
 # THIS WHOLE FILE IS DEPRECATED AND SHOULD NOT BE USED ANYMORE AS IT WILL BE REMOVED IN FUTURE VERSIONS
 ##################################
