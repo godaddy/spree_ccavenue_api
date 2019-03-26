@@ -1,19 +1,15 @@
 source 'https://rubygems.org'
 
-group :development, :test do
-  gem 'rails', '~> 4.0.5'
-  gem 'rspec-rails'
-  gem 'factory_girl_rails', '~> 4.0'
-  gem 'awesome_print'
-  gem 'simplecov-rcov'
-  gem 'yarjuf'
-  gem 'require_all'
-  gem 'byebug'
-end
-
-gem 'spree', github: 'godaddy/spree', branch: '2-2-nemo-stable'
-
-# Provides basic authentication functionality for testing parts of your engine
-gem 'spree_auth_devise', github: 'spree/spree_auth_devise', branch: '2-2-stable'
+gem 'spree', git: 'https://github.com/godaddy/spree', branch: 'rails_50'
+gem 'spree_auth_devise', git: 'https://github.com/godaddy/spree_auth_devise', branch: 'rails_50'
 
 gemspec
+
+group :development, :test do
+  gem 'byebug'
+  gem 'listen'
+end
+group :development, :test do
+  gem 'guard-rspec'
+  gem 'terminal-notifier-guard'
+end

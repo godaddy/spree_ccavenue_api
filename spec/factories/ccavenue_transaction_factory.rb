@@ -1,9 +1,9 @@
-require 'factory_girl'
+require 'factory_bot'
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :ccavenue_transaction, :class => Spree::Ccavenue::Transaction do
-    order { FactoryGirl.create(:order) }
-    payment_method { FactoryGirl.create(:gateway_ccavenue) }
+    order { FactoryBot.create(:order) }
+    payment_method { FactoryBot.create(:gateway_ccavenue) }
     amount {|t| t.order.amount }
     after(:create) do |txn, proxy|
       payment = Spree::Payment.new(:order => txn.order)

@@ -1,6 +1,6 @@
-require 'factory_girl'
+require 'factory_bot'
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :ccavenue_payment_gateway, :class => Spree::Gateway::Ccavenue do
     name 'ccavenue'
     environment 'test'
