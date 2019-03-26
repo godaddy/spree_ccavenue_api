@@ -1,4 +1,4 @@
-describe CcavenueApi::Response do
+RSpec.describe CcavenueApi::Response do
 
   let(:successful_http_payload) { {"status" => "0", "enc_response" => "1234"} }
   let(:failed_http_payload) { {"status" => "1", "enc_response" => "1234"} }

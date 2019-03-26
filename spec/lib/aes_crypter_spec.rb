@@ -1,4 +1,4 @@
-AESCrypter.describe do
+RSpec.describe AESCrypter do
 
   subject { AESCrypter }
 
@@ -17,7 +17,7 @@ AESCrypter.describe do
     end
 
     it "raises error when nil key provided" do
-      expect { subject.encrypt(plain_text, nil) }.to raise_error
+      expect { subject.encrypt(plain_text, nil) }.to raise_error(TypeError)
     end
 
   end
@@ -29,15 +29,15 @@ AESCrypter.describe do
     end
 
     it "raises error when wrong key provided" do
-      expect { subject.decrypt(encrypted_text, "not the original key") }.to raise_error
+      expect { subject.decrypt(encrypted_text, "not the original key") }.to raise_error(OpenSSL::Cipher::CipherError)
     end
 
     it "fails to decrypt when nil key provided" do
-      expect { subject.decrypt(encrypted_text, nil) }.to raise_error
+      expect { subject.decrypt(encrypted_text, nil) }.to raise_error(TypeError)
     end
 
     it "fails when nil value provided" do
-      expect { subject.decrypt(nil, key) }.to raise_error
+      expect { subject.decrypt(nil, key) }.to raise_error(ArgumentError)
     end
 
   end

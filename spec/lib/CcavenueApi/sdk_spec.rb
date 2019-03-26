@@ -1,4 +1,4 @@
-describe CcavenueApi::SDK do
+RSpec.describe CcavenueApi::SDK do
   let(:merchant_id) { '9999' }
   let(:enc_key) { '8728jdjdd' }
   let(:access_code) { '3421' }
@@ -14,7 +14,7 @@ describe CcavenueApi::SDK do
                                                   })) }
   let(:test_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => true)) }
   let(:prod_sdk) { CcavenueApi::SDK.new(sdk_args.merge(:test_mode => false)) }
-  let(:order) { FactoryGirl.create(:order_with_totals) }
+  let(:order) { FactoryBot.create(:order_with_totals) }
   let(:cc_transaction) { double('ccavenue_transaction', :id => 123, :tracking_id => '1234', :amount => 123, :ccavenue_amount => 456,
                                 ccavenue_order_number: 'R1234') }
   let(:data_for_cancel) { { 'order_List' => [{ reference_no: cc_transaction.tracking_id, amount: cc_transaction.ccavenue_amount.to_s }] }.to_json }

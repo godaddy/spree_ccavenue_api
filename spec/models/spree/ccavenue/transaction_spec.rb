@@ -1,6 +1,4 @@
-require 'spec_helper'
-
-describe Spree::Ccavenue::Transaction do
+RSpec.describe Spree::Ccavenue::Transaction do
   let(:successful_tran) { Spree::Ccavenue::Transaction.create! auth_desc: 'Success' }
   let(:failed_tran) { Spree::Ccavenue::Transaction.create! auth_desc: 'Failure' }
   let(:aborted_tran) { Spree::Ccavenue::Transaction.create! auth_desc: 'Aborted' }

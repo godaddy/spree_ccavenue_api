@@ -1,6 +1,5 @@
-require 'spec_helper'
-describe Spree::CcavenueController, :type => :controller do
-  let(:order) { FactoryGirl.create(:order_with_totals) }
+RSpec.describe Spree::CcavenueController, :type => :controller do
+  let(:order) { FactoryBot.create(:order_with_totals) }
 
   let!(:ccavenue_gw) { Spree::Gateway::Ccavenue.create!(:name        => 'ccavenue test gw',
                                                      environment: Rails.env) }
@@ -45,11 +44,12 @@ describe Spree::CcavenueController, :type => :controller do
         allow(controller).to receive(:ccavenue_redirect_params).and_return({})
       end
       it 'renders show' do
-        get :show, :id => ccavenue_gw.id, :use_route => 'spree'
+        skip 'views have been removed'
+        get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' }
         expect(response).to render_template("show")
       end
       it "creates a transaction" do
-        expect { get :show, :id => ccavenue_gw.id, :use_route => 'spree' }.to change { Spree::Ccavenue::Transaction.count }.by(1)
+        expect { get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' } }.to change { Spree::Ccavenue::Transaction.count }.by(1)
       end
     end
 
@@ -57,7 +57,7 @@ describe Spree::CcavenueController, :type => :controller do
       before do
         allow(controller).to receive(:current_order).at_least(:once).and_return(nil)
         allow(controller).to receive(:current_spree_user).at_least(:once).and_return(nil)
-        get :show, :id => ccavenue_gw.id, :use_route => 'spree'
+        get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' }
       end
       it "redirects to cart" do
         expect(response).to redirect_to spree.cart_path
@@ -81,11 +81,14 @@ describe Spree::CcavenueController, :type => :controller do
         expect(controller).to receive(:provider).at_least(:once).and_return(ccavenue_provider)
       end
       it "compiles and encrypts ccavenue params" do
-        get :show, :id => ccavenue_gw.id, :use_route => 'spree'
-        expect(assigns[:redirect_params]).to eq({:merchant_id     => merchant_id,
-                                                 :access_code     => access_code,
-                                                 :transaction_url => transaction_url,
-                                                 :enc_request     => dummy_encrypted_val})
+        get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' }
+        expect(controller.instance_variable_get('@redirect_params'))
+          .to eq(
+            {:merchant_id    => merchant_id,
+             :access_code     => access_code,
+             :transaction_url => transaction_url,
+             :enc_request     => dummy_encrypted_val}
+          )
       end
     end
 
@@ -93,9 +96,11 @@ describe Spree::CcavenueController, :type => :controller do
 
   context '#callback' do
     def do_post
-      post :callback, :id  => ccavenue_gw.id,
-           :encResp        => encResp,
-           :use_route      => 'spree'
+      post :callback, params: {
+        id: ccavenue_gw.id,
+        encResp: encResp,
+        use_route: 'spree'
+      }
     end
 
     before do
