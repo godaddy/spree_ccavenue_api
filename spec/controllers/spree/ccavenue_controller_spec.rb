@@ -49,7 +49,7 @@ RSpec.describe Spree::CcavenueController, :type => :controller do
         expect(response).to render_template("show")
       end
       it "creates a transaction" do
-        expect { get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' } }.to change { Spree::Ccavenue::Transaction.count }.by(1)
+        expect { get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' }, format: :json }.to change { Spree::Ccavenue::Transaction.count }.by(1)
       end
     end
 
@@ -81,7 +81,7 @@ RSpec.describe Spree::CcavenueController, :type => :controller do
         expect(controller).to receive(:provider).at_least(:once).and_return(ccavenue_provider)
       end
       it "compiles and encrypts ccavenue params" do
-        get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' }
+        get :show, params: { :id => ccavenue_gw.id, :use_route => 'spree' }, format: :json
         expect(controller.instance_variable_get('@redirect_params'))
           .to eq(
             {:merchant_id    => merchant_id,
