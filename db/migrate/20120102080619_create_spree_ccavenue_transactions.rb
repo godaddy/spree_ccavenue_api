@@ -1,4 +1,4 @@
-class CreateSpreeCcavenueTransactions < ActiveRecord::Migration
+class CreateSpreeCcavenueTransactions < ActiveRecord::Migration[4.2]
   def change
     create_table :spree_ccavenue_transactions do |t|
       t.integer :order_id

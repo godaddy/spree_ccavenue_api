@@ -8,7 +8,6 @@ require 'aes_crypter'
 
 module CcavenueApi
   class ApiCaller
-
     VALIDATION_SUCCESS_MSG = 'Providing Reference_No/Order No is mandatory'
 
     def self.refund(order, payment_method, tracking_id)
@@ -146,6 +145,5 @@ module CcavenueApi
         "#{self.reason} #{self.refund_status}"
       end
     end
-
   end
 end

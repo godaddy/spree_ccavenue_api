@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class AESCrypter
-
   INIT_VECTOR = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].pack('C*')
 
   def self.encrypt(plain_text, key)
@@ -26,8 +25,7 @@ class AESCrypter
 
   private
 
-  def self.aes_cipher
-    OpenSSL::Cipher::AES.new(128, :CBC)
-  end
-
+    def self.aes_cipher
+      OpenSSL::Cipher::AES.new(128, :CBC)
+    end
 end

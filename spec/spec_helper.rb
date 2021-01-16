@@ -1,14 +1,12 @@
+# frozen_string_literal: true
+
 if ENV["COVERAGE"]
-  require_relative 'rcov_exclude_list.rb'
+  require_relative File.join(@spec_helper_dir, 'rcov_exclude_list.rb')
   exlist = Dir.glob(@exclude_list)
   require 'simplecov'
   require 'simplecov-rcov'
   SimpleCov.formatter = SimpleCov::Formatter::RcovFormatter
-  SimpleCov.start do
-    exlist.each do |p|
-      add_filter p
-    end
-  end
+  SimpleCov.start('rails') { add_filter(exlist) }
 end
 
 # Configure Rails Environment
@@ -33,22 +31,13 @@ RSpec.configure do |config|
   config.infer_spec_type_from_file_location!
   config.filter_run_when_matching :focus
   config.disable_monkey_patching!
+  config.mock_with :rspec
+  config.use_transactional_fixtures = true
 
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
 
-  config.mock_with :rspec
-
-  config.use_transactional_fixtures = true
-
   config.include Spree::TestingSupport::UrlHelpers
   config.include Devise::Test::ControllerHelpers, type: :controller
-
-  config.fail_fast = ENV['FAIL_FAST'] || false
-end
-
-if ENV["COVERAGE"]
-  # Load all files except the ones in exclude list
-  require_all(Dir.glob('**/*.rb') - exlist)
 end

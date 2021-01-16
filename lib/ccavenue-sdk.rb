@@ -167,28 +167,26 @@ module CcavenueApi
 
     private
 
-    def init_from_merchant_credentials(new_access_code, new_encryption_key)
-      @access_code    = new_access_code
-      @encryption_key = new_encryption_key
-      @crypter        = Crypter.new(@encryption_key) if @encryption_key
-      @req_builder    = RequestBuilder.new(@access_code, @crypter) if @access_code && @encryption_key
-    end
+      def init_from_merchant_credentials(new_access_code, new_encryption_key)
+        @access_code    = new_access_code
+        @encryption_key = new_encryption_key
+        @crypter        = Crypter.new(@encryption_key) if @encryption_key
+        @req_builder    = RequestBuilder.new(@access_code, @crypter) if @access_code && @encryption_key
+      end
 
-    def api_request(payload)
-      http_response = ::RestClient::Request.execute(method:     :post, url: api_url, payload: payload,
-                                                    headers:    {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
-                                                    verify_ssl: !test_mode)
-      Response.successful_http_request(Rack::Utils.parse_query(http_response), crypter)
-    rescue ::RestClient::RequestTimeout, ::RestClient::Exception, RuntimeError => error
-      return Response.failed_http_request(error.message, crypter)
-    end
+      def api_request(payload)
+        http_response = ::RestClient::Request.execute(method:     :post, url: api_url, payload: payload,
+                                                      headers:    {'Accept' => 'application/json', :accept_encoding => 'gzip, deflate'},
+                                                      verify_ssl: !test_mode)
+        Response.successful_http_request(Rack::Utils.parse_query(http_response), crypter)
+      rescue ::RestClient::RequestTimeout, ::RestClient::Exception, RuntimeError => error
+        return Response.failed_http_request(error.message, crypter)
+      end
 
-    def build_and_invoke_api_request(transaction)
-      raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
-      api_request(yield)
-    end
-
-
+      def build_and_invoke_api_request(transaction)
+        raise ArgumentError.new(Spree.t('ccavenue.unable_to_void')) unless transaction.tracking_id
+        api_request(yield)
+      end
   end
 
   class RequestBuilder
@@ -361,9 +359,9 @@ module CcavenueApi
     end
 
     private
-    def check_if_equal(var, val)
-      self.class.check_if_equal(var, val)
-    end
 
+      def check_if_equal(var, val)
+        self.class.check_if_equal(var, val)
+      end
   end
 end

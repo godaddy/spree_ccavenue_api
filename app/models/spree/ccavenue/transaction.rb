@@ -2,7 +2,6 @@
 
 module Spree
   class Ccavenue::Transaction < ActiveRecord::Base
-
     def failed?
       self.auth_desc == 'Failure'
     end
@@ -25,6 +24,5 @@ module Spree
     def gateway_order_number(order)
       [order.number, '-', self.id].join
     end
-
   end
 end

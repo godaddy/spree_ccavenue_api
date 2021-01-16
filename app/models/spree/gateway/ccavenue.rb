@@ -2,7 +2,6 @@
 
 module Spree
   class Gateway::Ccavenue < Gateway
-
     preference :merchant_id, :string
     preference :access_code, :string
     preference :encryption_key, :string
@@ -93,7 +92,5 @@ module Spree
     def cancel(tracking_id)
       raise 'not implemented'
     end
-
-
   end
 end
